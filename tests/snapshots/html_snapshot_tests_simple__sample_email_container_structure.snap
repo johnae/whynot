@@ -1,0 +1,8 @@
+---
+source: tests/html_snapshot_tests_simple.rs
+assertion_line: 124
+expression: sample_email_structure
+---
+Container: .email-content - Classes: ["email-content", "main-email"]
+Container: .message-content - Classes: ["message-content"]
+Container: .html-content - Classes: ["html-content"]

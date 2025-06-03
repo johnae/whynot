@@ -1,0 +1,544 @@
+{% extends "base.html" %}
+
+{% block title %}Thread - Whynot Mail{% endblock %}
+
+{% block content %}
+<div class="thread">
+    <div class="thread-header">
+        <a href="/inbox" class="back-link">← Back to Inbox</a>
+        <h1>{% if !messages.is_empty() %}{{ messages[0].message.headers.subject }}{% else %}Thread{% endif %}</h1>
+    </div>
+    
+    <div class="messages">
+        {% for msg_with_content in messages %}
+        <div class="message" id="message-{{ loop.index }}">
+            <div class="message-meta">
+                <div class="message-from">
+                    <strong>{{ msg_with_content.message.headers.from }}</strong>
+                </div>
+                <div class="message-date">
+                    {{ msg_with_content.message.date_relative }}
+                </div>
+            </div>
+            
+            <div class="message-recipients">
+                <span class="label">To:</span> {{ msg_with_content.message.headers.to }}
+            </div>
+            
+            <div class="message-tags">
+                {% for tag in msg_with_content.message.tags %}
+                <span class="tag">{{ tag }}</span>
+                {% endfor %}
+            </div>
+            
+            <div class="message-body">
+                <div class="content-controls">
+                    {% if msg_with_content.rendered_content.has_html() && msg_with_content.rendered_content.has_plain() %}
+                    <div class="view-toggle">
+                        <button class="view-btn active" data-view="html" onclick="toggleView({{ loop.index }}, 'html')">HTML</button>
+                        <button class="view-btn" data-view="plain" onclick="toggleView({{ loop.index }}, 'plain')">Plain Text</button>
+                    </div>
+                    {% endif %}
+                    
+                    {% if msg_with_content.rendered_content.has_html() %}
+                    <div class="show-images-toggle">
+                        <button class="show-images-btn" id="show-images-btn-{{ loop.index }}" 
+                                data-message-index="{{ loop.index }}" 
+                                data-thread-id="{{ msg_with_content.thread_id }}"
+                                data-message-idx="{{ msg_with_content.message_index }}"
+                                onclick="toggleImages({{ loop.index }}, '{{ msg_with_content.thread_id }}', {{ msg_with_content.message_index }})">
+                            <span class="images-blocked-indicator">🚫</span> Images Blocked - <span class="show-images-text">Show Images</span>
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if msg_with_content.rendered_content.has_html() %}
+                <div class="message-content email-content" id="html-{{ loop.index }}">
+                    <iframe 
+                        class="email-content-frame"
+                        src="/email-frame/{{ msg_with_content.thread_id }}/{{ msg_with_content.message_index }}?theme={{ theme }}"
+                        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                        style="width: 100%; border: none; min-height: 500px;"
+                        onload="resizeIframe(this)"
+                    ></iframe>
+                </div>
+                {% endif %}
+                
+                {% if msg_with_content.rendered_content.has_plain() %}
+                <div class="message-content plain-content {% if msg_with_content.rendered_content.has_html() %}hidden{% endif %}" id="plain-{{ loop.index }}">
+                    <pre>{{ msg_with_content.rendered_content.plain.as_ref().unwrap() }}</pre>
+                </div>
+                {% endif %}
+                
+                {% if !msg_with_content.rendered_content.has_html() && !msg_with_content.rendered_content.has_plain() %}
+                <div class="message-content no-content">
+                    <em>No text content available</em>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if msg_with_content.message.has_attachments() %}
+            <div class="attachments">
+                <h4>Attachments</h4>
+                <div class="attachment-list">
+                    {% for attachment in msg_with_content.message.get_attachments() %}
+                    <div class="attachment-item">
+                        <span class="attachment-icon">
+                            {% if attachment.content_type.starts_with("image/") %}
+                                🖼️
+                            {% else if attachment.content_type == "application/pdf" %}
+                                📄
+                            {% else if attachment.content_type.starts_with("application/") %}
+                                📃
+                            {% else %}
+                                📎
+                            {% endif %}
+                        </span>
+                        <span class="attachment-info">
+                            <span class="attachment-name">
+                                {% if let Some(name) = attachment.filename.as_ref() %}
+                                    {{ name }}
+                                {% else %}
+                                    attachment_{{ attachment.id }}
+                                {% endif %}
+                            </span>
+                            <span class="attachment-type">{{ attachment.content_type }}</span>
+                            {% if let Some(size) = attachment.content_length %}
+                            <span class="attachment-size">({{ size }} bytes)</span>
+                            {% endif %}
+                        </span>
+                        <a href="/attachment/{{ msg_with_content.thread_id }}/{{ msg_with_content.message_index }}/{{ attachment.id }}" 
+                           class="attachment-download" download>
+                            Download
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.thread {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.thread-header {
+    margin-bottom: 24px;
+}
+
+.back-link {
+    color: var(--text-link);
+    font-size: 14px;
+}
+
+.thread h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+.messages {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.message {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+}
+
+.message-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.message-from {
+    font-size: 16px;
+}
+
+.message-date {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.message-recipients {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.label {
+    font-weight: 600;
+}
+
+.message-tags {
+    margin-bottom: 16px;
+}
+
+.message-body {
+    margin-top: 16px;
+}
+
+.message-content {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    overflow-x: auto;
+}
+
+.attachments {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.attachments h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.no-content {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.html-content pre {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.content-controls {
+    margin-bottom: 12px;
+}
+
+.view-toggle {
+    display: inline-flex;
+    gap: 4px;
+    background-color: var(--bg-secondary);
+    padding: 2px;
+    border-radius: 6px;
+}
+
+.view-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.view-btn.active {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.view-btn:hover:not(.active) {
+    color: var(--text-primary);
+}
+
+.show-images-toggle {
+    margin-left: 12px;
+    display: inline-block;
+}
+
+.show-images-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.show-images-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.show-images-btn.images-allowed {
+    background: var(--color-success-subtle);
+    color: var(--color-success-fg);
+    border-color: var(--color-success-muted);
+}
+
+.images-blocked-indicator {
+    font-size: 11px;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Email content container - optimized for email centering patterns */
+.email-content {
+    /* CSS isolation to prevent email styles from affecting main UI */
+    contain: layout style;
+    /* Allow horizontal scrolling for wide content */
+    overflow-x: auto;
+    /* Minimal spacing - let email control its own layout */
+    padding: 12px;
+    /* Remove background and border-radius to reduce "boxed-in" appearance */
+    background: transparent;
+    /* Reset margin to allow email centering to work properly */
+    margin: 0;
+    /* Use block display to preserve email layout intentions */
+    display: block;
+    /* Support common email width patterns */
+    width: 100%;
+    max-width: none;
+}
+
+/* Enhanced email centering support for various patterns */
+.email-content table[align="center"],
+.email-content table[style*="margin: 0 auto"],
+.email-content table[style*="margin:0 auto"],
+.email-content div[style*="margin: 0 auto"],
+.email-content div[style*="margin:0 auto"] {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Support for email container centering with max-width */
+.email-content > table,
+.email-content > div {
+    max-width: 100%;
+}
+
+/* Common email centering pattern support */
+.email-content [style*="max-width"][style*="margin"] {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Allow email responsive images to work */
+.email-content img {
+    max-width: 100% !important;
+    height: auto !important;
+}
+
+/* Preserve email typography */
+.email-content * {
+    /* Allow emails to override our font settings */
+    font-family: inherit;
+}
+
+/* Email iframe styles */
+.email-content-frame {
+    width: 100%;
+    border: none;
+    min-height: 500px;
+    display: block;
+}
+
+/* Support for email media queries and responsive design */
+@media screen and (max-width: 600px) {
+    .email-content table {
+        width: 100% !important;
+    }
+    
+    .email-content [style*="max-width"] {
+        max-width: 100% !important;
+    }
+}
+
+.plain-content pre {
+    padding: 16px;
+    background-color: var(--bg-primary);
+    border-radius: 6px;
+    margin: 0;
+}
+
+.attachment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.attachment-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.attachment-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.attachment-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attachment-type {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.attachment-size {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.attachment-download {
+    padding: 6px 12px;
+    background-color: var(--color-btn-primary-bg);
+    color: var(--color-btn-primary-text);
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    flex-shrink: 0;
+}
+
+.attachment-download:hover {
+    background-color: var(--color-btn-primary-hover-bg);
+}
+</style>
+
+<script>
+function toggleView(messageIndex, viewType) {
+    const htmlContent = document.getElementById(`html-${messageIndex}`);
+    const plainContent = document.getElementById(`plain-${messageIndex}`);
+    const buttons = document.querySelectorAll(`#message-${messageIndex} .view-btn`);
+    
+    if (viewType === 'html') {
+        htmlContent.classList.remove('hidden');
+        plainContent.classList.add('hidden');
+    } else {
+        htmlContent.classList.add('hidden');
+        plainContent.classList.remove('hidden');
+    }
+    
+    buttons.forEach(btn => {
+        if (btn.dataset.view === viewType) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
+function toggleImages(messageIndex, threadId, messageIdx) {
+    const button = document.getElementById(`show-images-btn-${messageIndex}`);
+    const iframe = document.querySelector(`#html-${messageIndex} iframe`);
+    
+    // Get current state from localStorage or default to blocked
+    const storageKey = `show-images-${threadId}-${messageIdx}`;
+    const isCurrentlyAllowed = localStorage.getItem(storageKey) === 'true';
+    
+    // Toggle state
+    const newState = !isCurrentlyAllowed;
+    localStorage.setItem(storageKey, newState.toString());
+    
+    // Update button appearance
+    updateImageButtonState(button, newState);
+    
+    // Reload iframe with new image state, preserving theme parameter
+    const currentSrc = iframe.src;
+    const url = new URL(currentSrc);
+    if (newState) {
+        url.searchParams.set('show_images', 'true');
+    } else {
+        url.searchParams.delete('show_images');
+    }
+    // Theme parameter is already in the URL, so it will be preserved
+    iframe.src = url.toString();
+}
+
+function updateImageButtonState(button, imagesAllowed) {
+    const indicator = button.querySelector('.images-blocked-indicator');
+    const text = button.querySelector('.show-images-text');
+    
+    if (imagesAllowed) {
+        button.classList.add('images-allowed');
+        indicator.textContent = '✅';
+        text.textContent = 'Hide Images';
+        button.title = 'Images are currently shown. Click to block images.';
+    } else {
+        button.classList.remove('images-allowed');
+        indicator.textContent = '🚫';
+        text.textContent = 'Show Images';
+        button.title = 'Images are currently blocked. Click to show images.';
+    }
+}
+
+// Initialize image button states on page load
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.show-images-btn').forEach(button => {
+        const threadId = button.dataset.threadId;
+        const messageIdx = button.dataset.messageIdx;
+        const storageKey = `show-images-${threadId}-${messageIdx}`;
+        const isAllowed = localStorage.getItem(storageKey) === 'true';
+        
+        updateImageButtonState(button, isAllowed);
+        
+        // Update iframe src if images should be shown, preserving theme parameter
+        if (isAllowed) {
+            const messageIndex = button.dataset.messageIndex;
+            const iframe = document.querySelector(`#html-${messageIndex} iframe`);
+            if (iframe) {
+                const url = new URL(iframe.src);
+                url.searchParams.set('show_images', 'true');
+                // Theme parameter is already in the URL, so it will be preserved
+                iframe.src = url.toString();
+            }
+        }
+    });
+});
+
+function resizeIframe(iframe) {
+    // Allow iframe to resize based on content
+    try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        const height = Math.max(
+            iframeDoc.body.scrollHeight,
+            iframeDoc.body.offsetHeight,
+            iframeDoc.documentElement.scrollHeight,
+            iframeDoc.documentElement.offsetHeight
+        );
+        iframe.style.height = height + 'px';
+    } catch (e) {
+        // Cross-origin or other security restriction
+        console.warn('Could not resize iframe:', e);
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Test Email Gallery{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="header">
+        <h1>Test Email Gallery</h1>
+        <p class="subtitle">Problematic emails for testing rendering issues</p>
+    </div>
+
+    <div class="email-grid">
+        {% for email in emails %}
+        <div class="email-card">
+            <h3>{{ email.display_name }}</h3>
+            <p class="email-description">{{ email.description }}</p>
+            <div class="email-actions">
+                <a href="/test/email-gallery/{{ email.name }}" class="btn btn-primary">View Normal</a>
+                <a href="/test/email-gallery/{{ email.name }}?mode=debug" class="btn btn-secondary">Debug Mode</a>
+                <a href="/test/email-gallery/{{ email.name }}?mode=split" class="btn btn-secondary">Split View</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.page-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.header {
+    margin-bottom: 3rem;
+}
+
+.header h1 {
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    color: var(--color-text-secondary);
+}
+
+.email-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 2rem;
+}
+
+.email-card {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.email-card h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+.email-description {
+    color: var(--color-text-secondary);
+    margin-bottom: 1rem;
+}
+
+.email-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: var(--color-accent);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--color-accent-hover);
+}
+
+.btn-secondary {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover {
+    background: var(--color-bg-secondary);
+}
+</style>
+{% endblock %}

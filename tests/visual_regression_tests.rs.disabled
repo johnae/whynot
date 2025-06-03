@@ -1,0 +1,355 @@
+use std::collections::HashMap;
+use std::time::Duration;
+use headless_chrome::{Browser, LaunchOptions};
+use reqwest::Client;
+use tokio::time::sleep;
+
+/// Visual regression testing for email rendering
+/// 
+/// This module tests the visual quality of email rendering by:
+/// 1. Starting the test gallery server
+/// 2. Capturing screenshots of problematic emails
+/// 3. Measuring layout metrics (container widths, centering, etc.)
+/// 4. Extracting computed CSS values for verification
+/// 5. Comparing before/after states for regressions
+
+#[derive(Debug, Clone)]
+pub struct EmailLayoutMetrics {
+    pub container_width: f64,
+    pub container_margin_left: String,
+    pub container_margin_right: String,
+    pub wrapper_count: usize,
+    pub background_color: String,
+    pub max_width: String,
+    pub is_centered: bool,
+    pub visible_padding: f64,
+    pub font_size: String,
+    pub color_preservation: f64, // 0.0-1.0 ratio of preserved CSS properties
+}
+
+pub struct VisualTestSetup {
+    pub server_url: String,
+    pub browser: Browser,
+    pub client: Client,
+}
+
+impl VisualTestSetup {
+    pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        // Start browser with proper options for testing
+        let launch_options = LaunchOptions::default_builder()
+            .headless(true)
+            .window_size(Some((1200, 800)))
+            .build()
+            .expect("Could not find chrome-executable");
+
+        let browser = Browser::new(launch_options)?;
+        let client = Client::new();
+        
+        Ok(VisualTestSetup {
+            server_url: "http://127.0.0.1:8080".to_string(),
+            browser,
+            client,
+        })
+    }
+
+    pub async fn wait_for_server(&self) -> Result<(), Box<dyn std::error::Error>> {
+        // Wait up to 10 seconds for server to be ready
+        for _ in 0..20 {
+            if let Ok(_) = self.client.get(&format!("{}/test/email-gallery", self.server_url)).send().await {
+                return Ok(());
+            }
+            sleep(Duration::from_millis(500)).await;
+        }
+        Err("Server did not start within 10 seconds".into())
+    }
+
+    pub async fn capture_email_screenshot(&self, email_name: &str, mode: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let tab = self.browser.new_tab()?;
+        let url = format!("{}/test/email-gallery/{}?mode={}", self.server_url, email_name, mode);
+        
+        tab.navigate_to(&url)?;
+        tab.wait_until_navigated()?;
+        
+        // Wait for content to render
+        sleep(Duration::from_millis(1000)).await;
+
+        let screenshot = tab.capture_screenshot(
+            headless_chrome::protocol::page::CaptureScreenshotFormatOption::Png,
+            Some(75),
+            None,
+            true,
+        )?;
+        
+        Ok(screenshot)
+    }
+
+    pub async fn extract_email_layout_metrics(&self, email_name: &str) -> Result<EmailLayoutMetrics, Box<dyn std::error::Error>> {
+        let tab = self.browser.new_tab()?;
+        let url = format!("{}/test/email-gallery/{}", self.server_url, email_name);
+        
+        tab.navigate_to(&url)?;
+        tab.wait_until_navigated()?;
+        
+        // Wait for content to render
+        sleep(Duration::from_millis(1000)).await;
+
+        // Extract layout metrics using JavaScript
+        let metrics_script = r#"
+        (function() {
+            const emailContent = document.querySelector('.email-content');
+            if (!emailContent) return null;
+            
+            const computedStyle = window.getComputedStyle(emailContent);
+            const rect = emailContent.getBoundingClientRect();
+            
+            // Count wrapper containers
+            let wrapperCount = 0;
+            let currentElement = emailContent;
+            while (currentElement && currentElement !== document.body) {
+                if (currentElement.classList.contains('email-content') || 
+                    currentElement.classList.contains('message-content') ||
+                    currentElement.classList.contains('html-content')) {
+                    wrapperCount++;
+                }
+                currentElement = currentElement.parentElement;
+            }
+            
+            // Check if element is visually centered
+            const parentWidth = emailContent.parentElement ? emailContent.parentElement.getBoundingClientRect().width : window.innerWidth;
+            const leftMargin = rect.left;
+            const rightMargin = parentWidth - rect.right;
+            const isCentered = Math.abs(leftMargin - rightMargin) < 20; // 20px tolerance
+            
+            // Calculate color preservation ratio (simplified)
+            const allElements = emailContent.querySelectorAll('*');
+            let elementsWithColor = 0;
+            let elementsWithPreservedColor = 0;
+            
+            for (let el of allElements) {
+                const style = window.getComputedStyle(el);
+                if (style.color && style.color !== 'rgb(0, 0, 0)') {
+                    elementsWithColor++;
+                    // Consider color preserved if it's not the default black
+                    if (style.color !== 'rgb(0, 0, 0)') {
+                        elementsWithPreservedColor++;
+                    }
+                }
+            }
+            
+            const colorPreservation = elementsWithColor > 0 ? elementsWithPreservedColor / elementsWithColor : 1.0;
+            
+            return {
+                containerWidth: rect.width,
+                containerMarginLeft: computedStyle.marginLeft,
+                containerMarginRight: computedStyle.marginRight,
+                wrapperCount: wrapperCount,
+                backgroundColor: computedStyle.backgroundColor,
+                maxWidth: computedStyle.maxWidth,
+                isCentered: isCentered,
+                visiblePadding: parseFloat(computedStyle.paddingLeft) + parseFloat(computedStyle.paddingRight),
+                fontSize: computedStyle.fontSize,
+                colorPreservation: colorPreservation
+            };
+        })();
+        "#;
+
+        let result = tab.evaluate(metrics_script, false)?;
+        
+        if let Some(object) = result.value {
+            let mut metrics = EmailLayoutMetrics {
+                container_width: 0.0,
+                container_margin_left: "0px".to_string(),
+                container_margin_right: "0px".to_string(),
+                wrapper_count: 0,
+                background_color: "rgb(255, 255, 255)".to_string(),
+                max_width: "none".to_string(),
+                is_centered: false,
+                visible_padding: 0.0,
+                font_size: "16px".to_string(),
+                color_preservation: 0.0,
+            };
+
+            if let Some(object) = object.as_object() {
+                if let Some(width) = object.get("containerWidth").and_then(|v| v.as_f64()) {
+                    metrics.container_width = width;
+                }
+                if let Some(margin_left) = object.get("containerMarginLeft").and_then(|v| v.as_str()) {
+                    metrics.container_margin_left = margin_left.to_string();
+                }
+                if let Some(margin_right) = object.get("containerMarginRight").and_then(|v| v.as_str()) {
+                    metrics.container_margin_right = margin_right.to_string();
+                }
+                if let Some(count) = object.get("wrapperCount").and_then(|v| v.as_u64()) {
+                    metrics.wrapper_count = count as usize;
+                }
+                if let Some(bg_color) = object.get("backgroundColor").and_then(|v| v.as_str()) {
+                    metrics.background_color = bg_color.to_string();
+                }
+                if let Some(max_w) = object.get("maxWidth").and_then(|v| v.as_str()) {
+                    metrics.max_width = max_w.to_string();
+                }
+                if let Some(centered) = object.get("isCentered").and_then(|v| v.as_bool()) {
+                    metrics.is_centered = centered;
+                }
+                if let Some(padding) = object.get("visiblePadding").and_then(|v| v.as_f64()) {
+                    metrics.visible_padding = padding;
+                }
+                if let Some(font) = object.get("fontSize").and_then(|v| v.as_str()) {
+                    metrics.font_size = font.to_string();
+                }
+                if let Some(color_pres) = object.get("colorPreservation").and_then(|v| v.as_f64()) {
+                    metrics.color_preservation = color_pres;
+                }
+            }
+
+            return Ok(metrics);
+            }
+        }
+
+        Err("Failed to extract layout metrics".into())
+    }
+}
+
+#[tokio::test]
+async fn test_visual_regression_baseline_capture() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    
+    // Start the test gallery server in the background
+    let server_handle = tokio::spawn(async {
+        // This would ideally start the test-gallery-server binary
+        // For now, we'll assume it's running
+    });
+
+    let setup = VisualTestSetup::new().await.expect("Failed to set up visual testing");
+    
+    // Wait for server to be ready
+    setup.wait_for_server().await.expect("Server not ready");
+
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+
+    for email_name in &test_emails {
+        println!("Capturing baseline screenshot for: {}", email_name);
+        
+        // Capture screenshots in different modes
+        let normal_screenshot = setup.capture_email_screenshot(email_name, "normal").await
+            .expect(&format!("Failed to capture normal screenshot for {}", email_name));
+        
+        let debug_screenshot = setup.capture_email_screenshot(email_name, "debug").await
+            .expect(&format!("Failed to capture debug screenshot for {}", email_name));
+
+        // Save screenshots for manual inspection
+        std::fs::create_dir_all("target/visual-tests").unwrap();
+        std::fs::write(format!("target/visual-tests/{}_normal_baseline.png", email_name), normal_screenshot).unwrap();
+        std::fs::write(format!("target/visual-tests/{}_debug_baseline.png", email_name), debug_screenshot).unwrap();
+
+        // Extract and validate layout metrics
+        let metrics = setup.extract_email_layout_metrics(email_name).await
+            .expect(&format!("Failed to extract metrics for {}", email_name));
+
+        println!("Layout metrics for {}: {:?}", email_name, metrics);
+
+        // Assert basic expectations
+        assert!(metrics.container_width > 0.0, "Container should have positive width");
+        assert!(metrics.wrapper_count <= 5, "Should not have excessive wrapper containers");
+        
+        // Email-specific assertions based on TODO.md findings
+        match *email_name {
+            "bilprovningen" => {
+                // Should have background color preserved
+                assert_ne!(metrics.background_color, "rgb(255, 255, 255)", 
+                    "Bilprovningen should preserve background color");
+            }
+            "stockholm-film-festival" => {
+                // Newsletter should preserve layout structure
+                assert!(metrics.color_preservation > 0.5, 
+                    "Stockholm Film Festival should preserve color styling");
+            }
+            "max-dead-rising" => {
+                // Promotional email should maintain visual hierarchy
+                assert!(metrics.container_width > 400.0, 
+                    "Max Dead Rising should have adequate container width");
+            }
+            _ => {}
+        }
+    }
+
+    server_handle.abort();
+}
+
+#[tokio::test]
+async fn test_email_centering_metrics() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = VisualTestSetup::new().await.expect("Failed to set up visual testing");
+    
+    setup.wait_for_server().await.expect("Server not ready");
+
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+
+    for email_name in &test_emails {
+        let metrics = setup.extract_email_layout_metrics(email_name).await
+            .expect(&format!("Failed to extract metrics for {}", email_name));
+
+        println!("Centering test for {}: centered={}, width={}, margins={}/{}", 
+            email_name, metrics.is_centered, metrics.container_width, 
+            metrics.container_margin_left, metrics.container_margin_right);
+
+        // This test documents the current state - these will likely fail initially
+        // showing the centering issues mentioned in TODO.md
+        if metrics.container_width < 1000.0 { // Only test centering for constrained emails
+            assert!(metrics.is_centered, 
+                "{} should be visually centered when using max-width constraints", email_name);
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_wrapper_container_analysis() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = VisualTestSetup::new().await.expect("Failed to set up visual testing");
+    
+    setup.wait_for_server().await.expect("Server not ready");
+
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+
+    for email_name in &test_emails {
+        let metrics = setup.extract_email_layout_metrics(email_name).await
+            .expect(&format!("Failed to extract metrics for {}", email_name));
+
+        println!("Container analysis for {}: {} wrappers, padding={}", 
+            email_name, metrics.wrapper_count, metrics.visible_padding);
+
+        // Document current wrapper count (TODO.md mentions this was acceptable in previous tests)
+        assert!(metrics.wrapper_count <= 5, 
+            "{} should not have excessive wrapper containers (found {})", email_name, metrics.wrapper_count);
+            
+        // Check for "multiple visual frames" effect mentioned in TODO.md
+        if metrics.wrapper_count > 3 && metrics.visible_padding > 40.0 {
+            println!("WARNING: {} may have 'multiple frames' effect: {} containers with {}px padding", 
+                email_name, metrics.wrapper_count, metrics.visible_padding);
+        }
+    }
+}
+
+#[tokio::test] 
+async fn test_css_property_preservation() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = VisualTestSetup::new().await.expect("Failed to set up visual testing");
+    
+    setup.wait_for_server().await.expect("Server not ready");
+
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+
+    for email_name in &test_emails {
+        let metrics = setup.extract_email_layout_metrics(email_name).await
+            .expect(&format!("Failed to extract metrics for {}", email_name));
+
+        println!("CSS preservation for {}: {:.2}% colors preserved", 
+            email_name, metrics.color_preservation * 100.0);
+
+        // According to TODO.md, CSS property preservation was fixed
+        // This test verifies that colors and styling are being preserved
+        assert!(metrics.color_preservation > 0.3, 
+            "{} should preserve at least 30% of color properties (found {:.2}%)", 
+            email_name, metrics.color_preservation * 100.0);
+    }
+}

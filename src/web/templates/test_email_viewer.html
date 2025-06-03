@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Test Email: {{ email_name }}{% endblock %}
+
+{% block content %}
+<div class="test-viewer-container">
+    <div class="viewer-header">
+        <a href="/test/email-gallery" class="back-link">← Back to Gallery</a>
+        <h1>{{ email_name }}</h1>
+        <div class="view-mode-selector">
+            <a href="/test/email-gallery/{{ email_name }}" 
+               class="mode-btn {% if view_mode == 'normal' %}active{% endif %}">Normal</a>
+            <a href="/test/email-gallery/{{ email_name }}?mode=debug" 
+               class="mode-btn {% if view_mode == 'debug' %}active{% endif %}">Debug</a>
+            <a href="/test/email-gallery/{{ email_name }}?mode=split" 
+               class="mode-btn {% if view_mode == 'split' %}active{% endif %}">Split</a>
+        </div>
+    </div>
+
+    {% if view_mode == 'normal' %}
+    <div class="email-display">
+        <div class="email-content">
+            {% if email_content.has_html() %}
+                {{ email_content.html.as_ref().unwrap()|safe }}
+            {% else %}
+                <p>No HTML content available</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    {% else if view_mode == 'debug' %}
+    <div class="debug-view">
+        <div class="debug-info">
+            <h3>Debug Information</h3>
+            <div class="metrics">
+                <div class="metric">
+                    <span class="label">Container Wrappers:</span>
+                    <span class="value" id="wrapper-count">Calculating...</span>
+                </div>
+                <div class="metric">
+                    <span class="label">CSS Properties Preserved:</span>
+                    <span class="value" id="css-preserved">Analyzing...</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Blocked Styles:</span>
+                    <span class="value" id="blocked-styles">Checking...</span>
+                </div>
+            </div>
+        </div>
+        <div class="email-display debug-mode">
+            <div class="email-content" id="debug-email-content">
+                {% if email_content.has_html() %}
+                    {{ email_content.html.as_ref().unwrap()|safe }}
+                {% else %}
+                    <p>No HTML content available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    {% else if view_mode == 'split' %}
+    <div class="split-view">
+        <div class="split-pane">
+            <h3>Raw HTML (Sanitized)</h3>
+            <div class="code-view">
+                <pre><code>{{ raw_html }}</code></pre>
+            </div>
+        </div>
+        <div class="split-pane">
+            <h3>Rendered Output</h3>
+            <div class="email-display">
+                <div class="email-content">
+                    {% if email_content.has_html() %}
+                        {{ email_content.html.as_ref().unwrap()|safe }}
+                    {% else %}
+                        <p>No HTML content available</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.test-viewer-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.viewer-header {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.back-link {
+    color: var(--color-accent);
+    text-decoration: none;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+.viewer-header h1 {
+    flex: 1;
+    margin: 0;
+}
+
+.view-mode-selector {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--color-bg-secondary);
+    border-radius: 6px;
+    padding: 0.25rem;
+}
+
+.mode-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--color-text-primary);
+    transition: all 0.2s;
+}
+
+.mode-btn:hover {
+    background: var(--color-bg-tertiary);
+}
+
+.mode-btn.active {
+    background: var(--color-accent);
+    color: white;
+}
+
+/* Normal view */
+.email-display {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 2rem;
+    min-height: 400px;
+}
+
+/* Debug view */
+.debug-view {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 2rem;
+}
+
+.debug-info {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    height: fit-content;
+    position: sticky;
+    top: 2rem;
+}
+
+.debug-info h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.metric {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.metric .label {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+}
+
+.metric .value {
+    font-family: 'SF Mono', Consolas, monospace;
+    font-weight: 600;
+}
+
+.debug-mode {
+    position: relative;
+}
+
+.debug-mode .email-content {
+    outline: 2px dashed rgba(255, 0, 0, 0.3);
+    outline-offset: -2px;
+}
+
+.debug-mode .message-content {
+    outline: 2px dashed rgba(0, 255, 0, 0.3);
+    outline-offset: -2px;
+}
+
+.debug-mode .html-content {
+    outline: 2px dashed rgba(0, 0, 255, 0.3);
+    outline-offset: -2px;
+}
+
+/* Split view */
+.split-view {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    height: 80vh;
+}
+
+.split-pane {
+    display: flex;
+    flex-direction: column;
+}
+
+.split-pane h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.code-view {
+    flex: 1;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow: auto;
+}
+
+.code-view pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.code-view code {
+    font-family: 'SF Mono', Consolas, monospace;
+    font-size: 0.875rem;
+}
+
+.split-view .email-display {
+    flex: 1;
+    overflow: auto;
+}
+</style>
+
+<script>
+if ("{{ view_mode }}" === "debug") {
+    document.addEventListener("DOMContentLoaded", function() {
+        // Count wrapper containers
+        const emailContent = document.getElementById("debug-email-content");
+        let wrapperCount = 0;
+        let current = emailContent;
+        while (current && current.children.length === 1 && 
+               (current.className.includes("content") || current.tagName === "DIV")) {
+            wrapperCount++;
+            current = current.children[0];
+        }
+        document.getElementById("wrapper-count").textContent = wrapperCount;
+        
+        // Analyze CSS properties
+        const allElements = emailContent.querySelectorAll("*");
+        let totalStyles = 0;
+        let preservedStyles = 0;
+        let blockedStyles = [];
+        
+        allElements.forEach(el => {
+            const computedStyle = window.getComputedStyle(el);
+            const inlineStyle = el.getAttribute("style");
+            
+            if (inlineStyle) {
+                const styleProps = inlineStyle.split(";").filter(s => s.trim());
+                totalStyles += styleProps.length;
+                
+                styleProps.forEach(prop => {
+                    const [name, value] = prop.split(":").map(s => s.trim());
+                    if (name && value) {
+                        const computed = computedStyle.getPropertyValue(name);
+                        if (computed && computed !== "initial" && computed !== "inherit") {
+                            preservedStyles++;
+                        } else {
+                            blockedStyles.push(`${name}: ${value}`);
+                        }
+                    }
+                });
+            }
+        });
+        
+        const percentage = totalStyles > 0 ? Math.round((preservedStyles / totalStyles) * 100) : 0;
+        document.getElementById("css-preserved").textContent = `${preservedStyles}/${totalStyles} (${percentage}%)`;
+        document.getElementById("blocked-styles").textContent = blockedStyles.length > 0 
+            ? blockedStyles.slice(0, 5).join(", ") + (blockedStyles.length > 5 ? "..." : "")
+            : "None";
+        
+        // Add visual indicators for wrapper containers
+        let visualCurrent = emailContent;
+        let depth = 0;
+        while (visualCurrent && depth < 10) {
+            if (visualCurrent.className.includes("content") || 
+                (visualCurrent.tagName === "DIV" && visualCurrent.children.length === 1)) {
+                visualCurrent.style.outline = `2px dashed hsl(${depth * 30}, 70%, 50%)`;
+                visualCurrent.style.outlineOffset = `-${2 + depth * 2}px`;
+                visualCurrent.setAttribute("data-wrapper-depth", depth);
+            }
+            visualCurrent = visualCurrent.children[0];
+            depth++;
+        }
+    });
+}
+</script>
+{% endblock %}

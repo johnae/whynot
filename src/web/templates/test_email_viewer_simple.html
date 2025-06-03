@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+
+{% block title %}Test Email: {{ email_name }}{% endblock %}
+
+{% block content %}
+<div class="test-viewer-container">
+    <div class="viewer-header">
+        <a href="/test/email-gallery">← Back to Gallery</a>
+        <h1>{{ email_name }}</h1>
+        
+        <div class="view-mode-controls">
+            <button onclick="setViewMode('normal')" class="view-mode-btn" id="normal-btn">Normal</button>
+            <button onclick="setViewMode('debug')" class="view-mode-btn" id="debug-btn">Debug</button>
+            <button onclick="setViewMode('split')" class="view-mode-btn" id="split-btn">Split</button>
+        </div>
+    </div>
+
+    <!-- Debug Mode Analysis Panel -->
+    <div id="debug-panel" class="debug-panel" style="display: none;">
+        <h3>📊 Layout Analysis</h3>
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h4>Container Analysis</h4>
+                <div id="container-metrics">
+                    <div>Wrapper containers: <span id="wrapper-count">-</span></div>
+                    <div>Total width: <span id="container-width">-</span></div>
+                    <div>Is centered: <span id="is-centered">-</span></div>
+                    <div>Visible padding: <span id="visible-padding">-</span></div>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <h4>CSS Preservation</h4>
+                <div id="css-metrics">
+                    <div>Colors preserved: <span id="color-preservation">-</span></div>
+                    <div>Background colors: <span id="bg-colors">-</span></div>
+                    <div>Font sizes: <span id="font-sizes">-</span></div>
+                    <div>Layout properties: <span id="layout-props">-</span></div>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <h4>Table Analysis</h4>
+                <div id="table-metrics">
+                    <div>Table count: <span id="table-count">-</span></div>
+                    <div>With borders: <span id="tables-with-borders">-</span></div>
+                    <div>With spacing: <span id="tables-with-spacing">-</span></div>
+                    <div>Alignment preserved: <span id="table-alignment">-</span></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="visual-indicators">
+            <h4>Visual Container Mapping</h4>
+            <div id="container-map"></div>
+        </div>
+    </div>
+
+    <!-- Normal/Debug Email Display -->
+    <div id="normal-view" class="email-display">
+        <div class="email-content">
+            {% if email_content.has_html() %}
+                {{ email_content.html.as_ref().unwrap()|safe }}
+            {% else %}
+                <p>No HTML content available</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Split View -->
+    <div id="split-view" class="split-view-container" style="display: none;">
+        <div class="split-panel">
+            <h4>Sanitized HTML</h4>
+            <pre id="raw-html-content">{% if email_content.has_html() %}{{ email_content.html.as_ref().unwrap()|e }}{% else %}No HTML content{% endif %}</pre>
+        </div>
+        <div class="split-panel">
+            <h4>Rendered Output</h4>
+            <div class="email-content">
+                {% if email_content.has_html() %}
+                    {{ email_content.html.as_ref().unwrap()|safe }}
+                {% else %}
+                    <p>No HTML content available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.test-viewer-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.viewer-header {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.viewer-header h1 {
+    flex: 1;
+    margin: 0;
+}
+
+.view-mode-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.view-mode-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    color: var(--color-fg-default);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.view-mode-btn:hover {
+    background: var(--color-bg-tertiary);
+}
+
+.view-mode-btn.active {
+    background: var(--color-accent-emphasis);
+    color: var(--color-fg-on-emphasis);
+    border-color: var(--color-accent-emphasis);
+}
+
+.debug-panel {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.debug-panel h3 {
+    margin: 0 0 1rem 0;
+    color: var(--color-fg-default);
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.metric-card {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.metric-card h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.875rem;
+    color: var(--color-fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.metric-card div {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.metric-card span {
+    font-weight: 600;
+    color: var(--color-accent-fg);
+}
+
+.visual-indicators {
+    border-top: 1px solid var(--color-border);
+    padding-top: 1rem;
+}
+
+.visual-indicators h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.875rem;
+    color: var(--color-fg-muted);
+}
+
+#container-map {
+    font-family: monospace;
+    font-size: 0.75rem;
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 0.75rem;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.email-display {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 2rem;
+    min-height: 400px;
+}
+
+.split-view-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.split-panel {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.split-panel h4 {
+    margin: 0 0 1rem 0;
+    font-size: 0.875rem;
+    color: var(--color-fg-muted);
+    text-transform: uppercase;
+}
+
+.split-panel pre {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 1rem;
+    overflow: auto;
+    max-height: 500px;
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+/* Visual container highlighting for debug mode */
+.debug-mode .email-content {
+    position: relative;
+}
+
+.debug-mode .email-content > * {
+    border: 1px dashed rgba(255, 0, 0, 0.3) !important;
+    margin: 2px !important;
+}
+
+.debug-mode .email-content .message-content {
+    border: 2px solid rgba(0, 255, 0, 0.5) !important;
+}
+
+.debug-mode .email-content .html-content {
+    border: 2px solid rgba(0, 0, 255, 0.5) !important;
+}
+
+.container-highlight {
+    position: absolute;
+    border: 2px solid rgba(255, 165, 0, 0.8);
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.container-label {
+    position: absolute;
+    background: rgba(255, 165, 0, 0.9);
+    color: white;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: bold;
+    border-radius: 2px;
+    top: -20px;
+    left: 0;
+}
+</style>
+
+<script>
+let currentMode = 'normal';
+
+function setViewMode(mode) {
+    currentMode = mode;
+    
+    // Update button states
+    document.querySelectorAll('.view-mode-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(mode + '-btn').classList.add('active');
+    
+    // Show/hide appropriate views
+    const debugPanel = document.getElementById('debug-panel');
+    const normalView = document.getElementById('normal-view');
+    const splitView = document.getElementById('split-view');
+    
+    if (mode === 'debug') {
+        debugPanel.style.display = 'block';
+        normalView.style.display = 'block';
+        splitView.style.display = 'none';
+        document.body.classList.add('debug-mode');
+        analyzeEmailLayout();
+        highlightContainers();
+    } else if (mode === 'split') {
+        debugPanel.style.display = 'none';
+        normalView.style.display = 'none';
+        splitView.style.display = 'grid';
+        document.body.classList.remove('debug-mode');
+        removeContainerHighlights();
+    } else { // normal
+        debugPanel.style.display = 'none';
+        normalView.style.display = 'block';
+        splitView.style.display = 'none';
+        document.body.classList.remove('debug-mode');
+        removeContainerHighlights();
+    }
+    
+    // Update URL to reflect mode
+    const url = new URL(window.location);
+    if (mode !== 'normal') {
+        url.searchParams.set('mode', mode);
+    } else {
+        url.searchParams.delete('mode');
+    }
+    window.history.replaceState({}, '', url);
+}
+
+function analyzeEmailLayout() {
+    const emailContent = document.querySelector('.email-content');
+    if (!emailContent) return;
+    
+    // Container analysis
+    const wrapperContainers = emailContent.querySelectorAll('.email-content, .message-content, .html-content');
+    document.getElementById('wrapper-count').textContent = wrapperContainers.length;
+    
+    const rect = emailContent.getBoundingClientRect();
+    document.getElementById('container-width').textContent = Math.round(rect.width) + 'px';
+    
+    // Check centering
+    const parentWidth = emailContent.parentElement ? emailContent.parentElement.getBoundingClientRect().width : window.innerWidth;
+    const leftMargin = rect.left;
+    const rightMargin = parentWidth - rect.right;
+    const isCentered = Math.abs(leftMargin - rightMargin) < 20;
+    document.getElementById('is-centered').textContent = isCentered ? '✅ Yes' : '❌ No';
+    
+    const computedStyle = window.getComputedStyle(emailContent);
+    const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
+    const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
+    document.getElementById('visible-padding').textContent = (paddingLeft + paddingRight) + 'px';
+    
+    // CSS preservation analysis
+    const allElements = emailContent.querySelectorAll('*');
+    let elementsWithColor = 0;
+    let elementsWithBgColor = 0;
+    let elementsWithFontSize = 0;
+    let elementsWithLayout = 0;
+    
+    for (let el of allElements) {
+        const style = window.getComputedStyle(el);
+        if (style.color && style.color !== 'rgb(0, 0, 0)') elementsWithColor++;
+        if (style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)') elementsWithBgColor++;
+        if (style.fontSize && style.fontSize !== '16px') elementsWithFontSize++;
+        if (style.display && style.display !== 'block' || style.position !== 'static') elementsWithLayout++;
+    }
+    
+    document.getElementById('color-preservation').textContent = elementsWithColor;
+    document.getElementById('bg-colors').textContent = elementsWithBgColor;
+    document.getElementById('font-sizes').textContent = elementsWithFontSize;
+    document.getElementById('layout-props').textContent = elementsWithLayout;
+    
+    // Table analysis
+    const tables = emailContent.querySelectorAll('table');
+    let tablesWithBorders = 0;
+    let tablesWithSpacing = 0;
+    let tablesWithAlignment = 0;
+    
+    for (let table of tables) {
+        const style = window.getComputedStyle(table);
+        if (style.border && style.border !== 'none' || table.getAttribute('border')) tablesWithBorders++;
+        if (table.getAttribute('cellspacing') || table.getAttribute('cellpadding')) tablesWithSpacing++;
+        if (table.getAttribute('align') || style.textAlign !== 'start') tablesWithAlignment++;
+    }
+    
+    document.getElementById('table-count').textContent = tables.length;
+    document.getElementById('tables-with-borders').textContent = tablesWithBorders;
+    document.getElementById('tables-with-spacing').textContent = tablesWithSpacing;
+    document.getElementById('table-alignment').textContent = tablesWithAlignment;
+    
+    // Container mapping
+    generateContainerMap();
+}
+
+function generateContainerMap() {
+    const emailContent = document.querySelector('.email-content');
+    if (!emailContent) return;
+    
+    let map = 'Email Container Structure:\n';
+    map += '═══════════════════════════\n';
+    
+    function walkTree(element, depth = 0) {
+        const indent = '  '.repeat(depth);
+        const tagName = element.tagName.toLowerCase();
+        const classes = element.className ? ` .${element.className.split(' ').join('.')}` : '';
+        const id = element.id ? ` #${element.id}` : '';
+        
+        map += `${indent}${tagName}${id}${classes}\n`;
+        
+        // Only show first few levels to avoid overwhelming
+        if (depth < 4) {
+            for (let child of element.children) {
+                walkTree(child, depth + 1);
+            }
+        } else if (element.children.length > 0) {
+            map += `${indent}  ... (${element.children.length} more children)\n`;
+        }
+    }
+    
+    walkTree(emailContent);
+    document.getElementById('container-map').textContent = map;
+}
+
+function highlightContainers() {
+    removeContainerHighlights();
+    
+    const containers = document.querySelectorAll('.email-content, .message-content, .html-content');
+    
+    containers.forEach((container, index) => {
+        const rect = container.getBoundingClientRect();
+        const highlight = document.createElement('div');
+        highlight.className = 'container-highlight';
+        highlight.style.left = (rect.left + window.scrollX) + 'px';
+        highlight.style.top = (rect.top + window.scrollY) + 'px';
+        highlight.style.width = rect.width + 'px';
+        highlight.style.height = rect.height + 'px';
+        
+        const label = document.createElement('div');
+        label.className = 'container-label';
+        label.textContent = container.className.split(' ')[0] || 'container';
+        highlight.appendChild(label);
+        
+        document.body.appendChild(highlight);
+    });
+}
+
+function removeContainerHighlights() {
+    document.querySelectorAll('.container-highlight').forEach(el => el.remove());
+}
+
+// Initialize based on URL parameter
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('mode') || 'normal';
+    setViewMode(mode);
+});
+
+// Update analysis when window resizes
+window.addEventListener('resize', function() {
+    if (currentMode === 'debug') {
+        setTimeout(() => {
+            analyzeEmailLayout();
+            highlightContainers();
+        }, 100);
+    }
+});
+</script>
+{% endblock %}

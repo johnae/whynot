@@ -1,0 +1,328 @@
+use std::time::Duration;
+use reqwest::Client;
+use tokio::time::sleep;
+// use whynot::test_utils::NotmuchTestSetup; // Not available in this context"
+use insta::assert_snapshot;
+use scraper::{Html, Selector};
+
+/// HTML snapshot testing for email rendering regression detection
+/// 
+/// This module creates snapshots of rendered email HTML to detect regressions
+/// in the email rendering pipeline. Tests capture:
+/// 1. Complete rendered HTML output for each problematic email
+/// 2. Sanitized email content extraction
+/// 3. CSS property preservation verification
+/// 4. Container structure analysis
+struct HtmlSnapshotSetup {
+    client: Client,
+    server_url: String,
+}
+
+impl HtmlSnapshotSetup {
+    async fn new() -> Self {
+        Self {
+            client: Client::new(),
+            server_url: "http://127.0.0.1:8080".to_string(),
+        }
+    }
+
+    async fn wait_for_server(&self) -> Result<(), Box<dyn std::error::Error>> {
+        for _ in 0..20 {
+            if let Ok(_) = self.client.get(&format!("{}/test/email-gallery", self.server_url)).send().await {
+                return Ok(());
+            }
+            sleep(Duration::from_millis(500)).await;
+        }
+        Err("Server did not start within 10 seconds".into())
+    }
+
+    async fn get_email_html(&self, email_name: &str, mode: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let url = format!("{}/test/email-gallery/{}?mode={}", self.server_url, email_name, mode);
+        let response = self.client.get(&url).send().await?;
+        Ok(response.text().await?)
+    }
+
+    fn extract_email_content(&self, html: &str) -> String {
+        let document = Html::parse_document(html);
+        let email_selector = Selector::parse(".email-content").unwrap();
+        
+        if let Some(email_element) = document.select(&email_selector).next() {
+            email_element.html()
+        } else {
+            "<!-- No email content found -->".to_string()
+        }
+    }
+
+    fn extract_container_structure(&self, html: &str) -> String {
+        let document = Html::parse_document(html);
+        let container_selectors = [
+            ".email-content",
+            ".message-content", 
+            ".html-content",
+            ".content-wrapper"
+        ];
+        
+        let mut structure = String::new();
+        for selector_str in &container_selectors {
+            if let Ok(selector) = Selector::parse(selector_str) {
+                for element in document.select(&selector) {
+                    structure.push_str(&format!(
+                        "Container: {} - Classes: {:?}\n",
+                        selector_str,
+                        element.value().classes().collect::<Vec<_>>()
+                    ));
+                }
+            }
+        }
+        structure
+    }
+
+    fn extract_css_properties(&self, html: &str) -> String {
+        let document = Html::parse_document(html);
+        let style_selector = Selector::parse("[style]").unwrap();
+        
+        let mut styles = Vec::new();
+        for element in document.select(&style_selector) {
+            if let Some(style) = element.value().attr("style") {
+                styles.push(format!("{}: {}", element.value().name(), style));
+            }
+        }
+        
+        styles.join("\n")
+    }
+}
+
+// Tests temporarily disabled - require NotmuchTestSetup which is not available
+// #[tokio::test]
+// async fn test_snapshot_bilprovningen_normal_mode() {
+//    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = HtmlSnapshotSetup::new().await;
+    
+    setup.wait_for_server().await.expect("Server not ready");
+    
+    let html = setup.get_email_html("bilprovningen", "normal").await
+        .expect("Failed to get bilprovningen HTML");
+    
+    let email_content = setup.extract_email_content(&html);
+    
+    // Create snapshot of the email content area only
+    assert_snapshot!("bilprovningen_email_content", email_content);
+}
+
+#[tokio::test]
+async fn test_snapshot_stockholm_film_festival_normal_mode() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = HtmlSnapshotSetup::new().await;
+    
+    setup.wait_for_server().await.expect("Server not ready");
+    
+    let html = setup.get_email_html("stockholm-film-festival", "normal").await
+        .expect("Failed to get stockholm-film-festival HTML");
+    
+    let email_content = setup.extract_email_content(&html);
+    
+    assert_snapshot!("stockholm_film_festival_email_content", email_content);
+}
+
+#[tokio::test]
+async fn test_snapshot_max_dead_rising_normal_mode() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = HtmlSnapshotSetup::new().await;
+    
+    setup.wait_for_server().await.expect("Server not ready");
+    
+    let html = setup.get_email_html("max-dead-rising", "normal").await
+        .expect("Failed to get max-dead-rising HTML");
+    
+    let email_content = setup.extract_email_content(&html);
+    
+    assert_snapshot!("max_dead_rising_email_content", email_content);
+}
+
+#[tokio::test]
+async fn test_snapshot_container_structures() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = HtmlSnapshotSetup::new().await;
+    
+    setup.wait_for_server().await.expect("Server not ready");
+    
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+    let mut all_structures = String::new();
+    
+    for email_name in &test_emails {
+        let html = setup.get_email_html(email_name, "normal").await
+            .expect(&format!("Failed to get {} HTML", email_name));
+        
+        let structure = setup.extract_container_structure(&html);
+        all_structures.push_str(&format!("\n=== {} ===\n{}", email_name, structure));
+    }
+    
+    // Snapshot the container structure analysis
+    assert_snapshot!("email_container_structures", all_structures);
+}
+
+#[tokio::test]
+async fn test_snapshot_css_property_preservation() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = HtmlSnapshotSetup::new().await;
+    
+    setup.wait_for_server().await.expect("Server not ready");
+    
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+    let mut all_css_properties = String::new();
+    
+    for email_name in &test_emails {
+        let html = setup.get_email_html(email_name, "normal").await
+            .expect(&format!("Failed to get {} HTML", email_name));
+        
+        let css_properties = setup.extract_css_properties(&html);
+        all_css_properties.push_str(&format!("\n=== {} CSS Properties ===\n{}\n", email_name, css_properties));
+    }
+    
+    // Snapshot preserved CSS properties for regression detection
+    assert_snapshot!("preserved_css_properties", all_css_properties);
+}
+
+#[tokio::test]
+async fn test_snapshot_debug_mode_analysis() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = HtmlSnapshotSetup::new().await;
+    
+    setup.wait_for_server().await.expect("Server not ready");
+    
+    // Test debug mode output for one email to verify enhanced analysis
+    let html = setup.get_email_html("bilprovningen", "debug").await
+        .expect("Failed to get bilprovningen debug HTML");
+    
+    // Extract just the debug analysis section
+    let document = Html::parse_document(&html);
+    let debug_selector = Selector::parse(".debug-analysis, .metrics-panel").unwrap_or_else(|_| {
+        // Fallback to a broader selector if specific debug classes aren't found
+        Selector::parse(".debug").unwrap_or_else(|_| Selector::parse("body").unwrap())
+    });
+    
+    let mut debug_content = String::new();
+    for element in document.select(&debug_selector) {
+        debug_content.push_str(&element.html());
+        debug_content.push('\n');
+    }
+    
+    if debug_content.is_empty() {
+        debug_content = "<!-- No debug analysis found -->".to_string();
+    }
+    
+    assert_snapshot!("bilprovningen_debug_analysis", debug_content);
+}
+
+#[tokio::test]
+async fn test_snapshot_split_mode_comparison() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = HtmlSnapshotSetup::new().await;
+    
+    setup.wait_for_server().await.expect("Server not ready");
+    
+    // Test split mode for comparing raw vs rendered HTML
+    let html = setup.get_email_html("stockholm-film-festival", "split").await
+        .expect("Failed to get stockholm-film-festival split HTML");
+    
+    // Extract the comparison sections
+    let document = Html::parse_document(&html);
+    let split_selectors = [".raw-html", ".rendered-html", ".split-view"];
+    
+    let mut split_content = String::new();
+    for selector_str in &split_selectors {
+        if let Ok(selector) = Selector::parse(selector_str) {
+            for element in document.select(&selector) {
+                split_content.push_str(&format!("\n=== {} ===\n", selector_str));
+                split_content.push_str(&element.html());
+            }
+        }
+    }
+    
+    if split_content.is_empty() {
+        split_content = "<!-- No split view content found -->".to_string();
+    }
+    
+    assert_snapshot!("stockholm_film_festival_split_comparison", split_content);
+}
+
+// Filtered snapshot tests for specific issues mentioned in TODO.md
+
+#[tokio::test]
+async fn test_snapshot_centering_patterns() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = HtmlSnapshotSetup::new().await;
+    
+    setup.wait_for_server().await.expect("Server not ready");
+    
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+    let mut centering_analysis = String::new();
+    
+    for email_name in &test_emails {
+        let html = setup.get_email_html(email_name, "normal").await
+            .expect(&format!("Failed to get {} HTML", email_name));
+        
+        let document = Html::parse_document(&html);
+        
+        // Look for common email centering patterns
+        let centering_selectors = [
+            r#"[style*="max-width"]"#,
+            r#"[style*="margin: 0 auto"]"#,
+            r#"[style*="margin:0 auto"]"#,
+            r#"[style*="text-align: center"]"#,
+            r#"[align="center"]"#
+        ];
+        
+        centering_analysis.push_str(&format!("\n=== {} Centering Patterns ===\n", email_name));
+        
+        for selector_str in &centering_selectors {
+            if let Ok(selector) = Selector::parse(selector_str) {
+                for element in document.select(&selector) {
+                    centering_analysis.push_str(&format!(
+                        "Found {}: style=\"{}\"\n", 
+                        element.value().name(),
+                        element.value().attr("style").unwrap_or("")
+                    ));
+                }
+            }
+        }
+    }
+    
+    assert_snapshot!("email_centering_patterns", centering_analysis);
+}
+
+#[tokio::test]
+async fn test_snapshot_table_layout_preservation() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let setup = HtmlSnapshotSetup::new().await;
+    
+    setup.wait_for_server().await.expect("Server not ready");
+    
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+    let mut table_analysis = String::new();
+    
+    for email_name in &test_emails {
+        let html = setup.get_email_html(email_name, "normal").await
+            .expect(&format!("Failed to get {} HTML", email_name));
+        
+        let document = Html::parse_document(&html);
+        let table_selector = Selector::parse("table").unwrap();
+        
+        table_analysis.push_str(&format!("\n=== {} Table Layouts ===\n", email_name));
+        
+        for (i, table) in document.select(&table_selector).enumerate() {
+            table_analysis.push_str(&format!("Table {}: ", i + 1));
+            
+            // Extract key table attributes
+            let attrs = ["width", "cellpadding", "cellspacing", "border", "align", "style"];
+            for attr in &attrs {
+                if let Some(value) = table.value().attr(attr) {
+                    table_analysis.push_str(&format!("{}=\"{}\" ", attr, value));
+                }
+            }
+            table_analysis.push('\n');
+        }
+    }
+    
+    assert_snapshot!("email_table_layouts", table_analysis);
+}

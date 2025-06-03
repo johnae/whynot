@@ -1,0 +1,527 @@
+/* CSS Variables for theming */
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-tertiary: #ffffff;
+    --text-primary: #24292e;
+    --text-secondary: #586069;
+    --text-link: #0366d6;
+    --border: #e1e4e8;
+    --accent: #0366d6;
+    --tag-bg: #f1f8ff;
+    --tag-text: #0366d6;
+    --navbar-bg: #24292e;
+    --navbar-text: #ffffff;
+}
+
+[data-theme="dark"] {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --text-primary: #c9d1d9;
+    --text-secondary: #8b949e;
+    --text-link: #58a6ff;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --tag-bg: #1f6feb;
+    --tag-text: #f0f6fc;
+    --navbar-bg: #161b22;
+    --navbar-text: #f0f6fc;
+}
+
+/* Reset and base styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+a {
+    color: var(--text-link);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Container */
+.container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+/* Navbar */
+.navbar {
+    background-color: var(--navbar-bg);
+    color: var(--navbar-text);
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.navbar .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.navbar .brand {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--navbar-text);
+}
+
+.navbar .brand:hover {
+    text-decoration: none;
+    opacity: 0.8;
+}
+
+.nav-items {
+    display: flex;
+    gap: 24px;
+}
+
+.nav-items a {
+    color: var(--navbar-text);
+    opacity: 0.8;
+}
+
+.nav-items a:hover {
+    opacity: 1;
+    text-decoration: none;
+}
+
+/* Main content */
+main {
+    padding: 24px 0;
+}
+
+/* Inbox */
+.inbox h1 {
+    font-size: 32px;
+    font-weight: 400;
+    margin-bottom: 24px;
+}
+
+.inbox-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+/* Search form */
+.search-form {
+    display: flex;
+    gap: 8px;
+}
+
+.search-input {
+    padding: 6px 12px;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    width: 300px;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.search-button {
+    padding: 6px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    background-color: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.search-button:hover {
+    opacity: 0.8;
+}
+
+/* Message list */
+.message-list {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.message-item {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background-color 0.1s ease;
+}
+
+.message-item:last-child {
+    border-bottom: none;
+}
+
+.message-item:hover {
+    background-color: var(--bg-secondary);
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.sender {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.date {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.subject {
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.subject a {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.subject a:hover {
+    color: var(--text-link);
+}
+
+/* Tags */
+.tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tag {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    background-color: var(--tag-bg);
+    color: var(--tag-text);
+    border-radius: 12px;
+}
+
+/* Search and filters layout */
+.search-and-filters {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-form {
+    flex: 1;
+    min-width: 300px;
+}
+
+/* Tag filtering UI */
+.tag-filters {
+    position: relative;
+}
+
+.filter-toggle {
+    padding: 8px 16px;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.filter-toggle:hover {
+    background-color: var(--bg-tertiary);
+    border-color: var(--accent);
+}
+
+.tag-filter-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(149, 157, 165, 0.2);
+    min-width: 300px;
+    max-width: 400px;
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+[data-theme="dark"] .tag-filter-dropdown {
+    box-shadow: 0 8px 24px rgba(1, 4, 9, 0.8);
+}
+
+.tag-filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+}
+
+.clear-filters {
+    background: none;
+    border: none;
+    color: var(--text-link);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.clear-filters:hover {
+    background-color: var(--bg-secondary);
+}
+
+.tag-list {
+    padding: 12px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tag-pill {
+    padding: 6px 12px;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.tag-pill:hover {
+    background-color: var(--bg-tertiary);
+    border-color: var(--accent);
+}
+
+.tag-pill.selected {
+    background-color: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* Active filters display */
+.active-filters {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+}
+
+.filter-label {
+    font-weight: 600;
+    margin-right: 12px;
+    color: var(--text-secondary);
+}
+
+.active-filter-tags {
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.active-filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background-color: var(--accent);
+    color: white;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.remove-filter {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 0 2px;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+}
+
+.remove-filter:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Empty state */
+.empty-state {
+    padding: 48px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.empty-state p {
+    font-size: 16px;
+}
+
+/* Tag list states */
+.no-tags, .error {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.error {
+    color: var(--danger);
+}
+
+/* Message content styling */
+.message-content {
+    padding: 16px;
+    margin: 16px 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background-color: var(--surface);
+}
+
+.message-content.no-content {
+    color: var(--text-secondary);
+    font-style: italic;
+    text-align: center;
+}
+
+.message-content pre {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* CSS isolation for email HTML content */
+.email-content {
+    /* CSS containment for isolation */
+    contain: style layout;
+    
+    /* Reset critical properties that could affect layout */
+    position: relative;
+    z-index: auto;
+    
+    /* Apply safe default styling */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    
+    /* Use explicit colors that work in both light and dark themes */
+    color: #24292f; /* Dark text for light theme */
+    
+    /* Additional isolation properties */
+    display: block;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    
+    /* Prevent email content from breaking out */
+    overflow: hidden;
+}
+
+/* Dark theme colors for email content */
+[data-theme="dark"] .email-content {
+    color: #f0f6fc; /* Light text for dark theme */
+}
+
+/* Reset styles inside email content to prevent inheritance issues */
+.email-content * {
+    /* Prevent email styles from affecting the main page */
+    max-width: 100% !important;
+    position: static !important;
+    z-index: auto !important;
+}
+
+/* Allow reasonable styling for email content elements */
+.email-content p {
+    margin: 0.5em 0;
+}
+
+.email-content h1, .email-content h2, .email-content h3, 
+.email-content h4, .email-content h5, .email-content h6 {
+    margin: 1em 0 0.5em 0;
+    line-height: 1.3;
+}
+
+.email-content table {
+    border-collapse: collapse;
+    max-width: 100%;
+    margin: 1em 0;
+}
+
+.email-content td, .email-content th {
+    padding: 8px;
+    border: 1px solid #ddd;
+    vertical-align: top;
+}
+
+.email-content a {
+    color: #0969da; /* Blue link for light theme */
+    text-decoration: underline;
+}
+
+.email-content a:hover {
+    color: #0550ae; /* Darker blue for hover */
+}
+
+/* Dark theme link colors */
+[data-theme="dark"] .email-content a {
+    color: #58a6ff; /* Light blue for dark theme */
+}
+
+[data-theme="dark"] .email-content a:hover {
+    color: #79c0ff; /* Lighter blue for hover */
+}
+
+.email-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Hide plain text content when HTML is available */
+.hidden {
+    display: none;
+}

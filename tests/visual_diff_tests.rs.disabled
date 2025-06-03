@@ -1,0 +1,502 @@
+use std::path::Path;
+use std::time::Duration;
+use headless_chrome::{Browser, LaunchOptions};
+use headless_chrome::protocol::cdp::Page::CaptureScreenshotFormatOption;
+use reqwest::Client;
+use tokio::time::sleep;
+
+/// Visual diff testing for email rendering quality measurement
+/// 
+/// This module provides automated visual regression testing by:
+/// 1. Capturing baseline screenshots of problematic emails
+/// 2. Measuring layout quality metrics programmatically
+/// 3. Comparing visual differences between rendering modes
+/// 4. Creating assertions for specific email rendering issues
+/// 5. Generating visual diff reports for manual inspection
+
+#[derive(Debug, Clone)]
+pub struct EmailRenderingQuality {
+    pub email_name: String,
+    pub centering_score: f64,      // 0.0-1.0, how well email is centered
+    pub container_efficiency: f64,  // 0.0-1.0, wrapper container optimization
+    pub css_fidelity: f64,         // 0.0-1.0, CSS property preservation
+    pub table_integrity: f64,      // 0.0-1.0, table layout preservation
+    pub responsive_score: f64,     // 0.0-1.0, responsive design functionality
+    pub overall_quality: f64,      // 0.0-1.0, weighted overall score
+}
+
+impl EmailRenderingQuality {
+    pub fn calculate_overall_score(&mut self) {
+        // Weighted scoring based on TODO.md priorities
+        self.overall_quality = self.centering_score * 0.25 +        // High priority: centering issues
+            self.container_efficiency * 0.20 +   // High priority: wrapper containers
+            self.css_fidelity * 0.20 +          // High priority: CSS preservation
+            self.table_integrity * 0.20 +       // Medium priority: table layouts
+            self.responsive_score * 0.15;        // Medium priority: responsive design
+    }
+}
+
+pub struct VisualDiffTester {
+    browser: Browser,
+    client: Client,
+    server_url: String,
+}
+
+impl VisualDiffTester {
+    pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        let launch_options = LaunchOptions::default_builder()
+            .headless(true)
+            .window_size(Some((1200, 800)))
+            .args(vec!["--no-sandbox", "--disable-dev-shm-usage"])
+            .build()
+            .expect("Could not build launch options");
+
+        let browser = Browser::new(launch_options)?;
+        let client = Client::new();
+        
+        Ok(VisualDiffTester {
+            browser,
+            client,
+            server_url: "http://127.0.0.1:8080".to_string(),
+        })
+    }
+
+    pub async fn wait_for_server(&self) -> Result<(), Box<dyn std::error::Error>> {
+        for _ in 0..20 {
+            if let Ok(_) = self.client.get(&format!("{}/test/email-gallery", self.server_url)).send().await {
+                return Ok(());
+            }
+            sleep(Duration::from_millis(500)).await;
+        }
+        Err("Server did not start within 10 seconds".into())
+    }
+
+    pub async fn measure_email_quality(&self, email_name: &str) -> Result<EmailRenderingQuality, Box<dyn std::error::Error>> {
+        let tab = self.browser.new_tab()?;
+        let url = format!("{}/test/email-gallery/{}", self.server_url, email_name);
+        
+        tab.navigate_to(&url)?;
+        tab.wait_until_navigated()?;
+        sleep(Duration::from_millis(1500)).await;
+
+        let quality_script = r#"
+        (function() {
+            const emailContent = document.querySelector('.email-content');
+            if (!emailContent) return null;
+            
+            // 1. CENTERING ANALYSIS
+            function analyzeCentering() {
+                const rect = emailContent.getBoundingClientRect();
+                const parentRect = emailContent.parentElement.getBoundingClientRect();
+                
+                // Check for common centering patterns
+                const style = window.getComputedStyle(emailContent);
+                const hasAutoMargins = style.marginLeft === 'auto' && style.marginRight === 'auto';
+                const hasMaxWidth = style.maxWidth !== 'none';
+                
+                // Calculate visual centering
+                const leftMargin = rect.left - parentRect.left;
+                const rightMargin = parentRect.right - rect.right;
+                const centeringDeviation = Math.abs(leftMargin - rightMargin);
+                const maxDeviation = Math.min(leftMargin + rightMargin, 50); // Max 50px deviation
+                
+                // Score based on centering patterns and visual centering
+                let score = 0;
+                if (hasAutoMargins) score += 0.4;
+                if (hasMaxWidth) score += 0.3;
+                if (centeringDeviation < maxDeviation) score += 0.3 * (1 - centeringDeviation / maxDeviation);
+                
+                return Math.min(score, 1.0);
+            }
+            
+            // 2. CONTAINER EFFICIENCY ANALYSIS
+            function analyzeContainerEfficiency() {
+                const allContainers = document.querySelectorAll('.email-content, .message-content, .html-content, .content-wrapper');
+                const totalContainers = allContainers.length;
+                
+                // Calculate padding/margin overhead
+                let totalPadding = 0;
+                allContainers.forEach(container => {
+                    const style = window.getComputedStyle(container);
+                    totalPadding += parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) +
+                                  parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+                });
+                
+                // Score: fewer containers and reasonable padding = better
+                const containerScore = Math.max(0, (5 - totalContainers) / 5); // Ideal: ≤2 containers
+                const paddingScore = Math.max(0, (80 - totalPadding) / 80);   // Ideal: ≤40px total
+                
+                return (containerScore + paddingScore) / 2;
+            }
+            
+            // 3. CSS FIDELITY ANALYSIS
+            function analyzeCSSFidelity() {
+                const allElements = emailContent.querySelectorAll('*');
+                let preservedProperties = 0;
+                let totalElements = 0;
+                
+                allElements.forEach(el => {
+                    totalElements++;
+                    const style = window.getComputedStyle(el);
+                    
+                    // Count preserved CSS properties
+                    if (style.color && style.color !== 'rgb(0, 0, 0)') preservedProperties++;
+                    if (style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)') preservedProperties++;
+                    if (style.fontSize && style.fontSize !== '16px') preservedProperties++;
+                    if (style.fontWeight && style.fontWeight !== '400') preservedProperties++;
+                    if (style.textAlign && style.textAlign !== 'start') preservedProperties++;
+                });
+                
+                return totalElements > 0 ? Math.min(preservedProperties / (totalElements * 2), 1.0) : 0;
+            }
+            
+            // 4. TABLE INTEGRITY ANALYSIS
+            function analyzeTableIntegrity() {
+                const tables = emailContent.querySelectorAll('table');
+                if (tables.length === 0) return 0.8; // No tables = neutral score
+                
+                let integrityScore = 0;
+                tables.forEach(table => {
+                    const style = window.getComputedStyle(table);
+                    
+                    // Check for preserved table properties
+                    if (table.getAttribute('border') || style.border !== 'none') integrityScore += 0.2;
+                    if (table.getAttribute('cellspacing')) integrityScore += 0.2;
+                    if (table.getAttribute('cellpadding')) integrityScore += 0.2;
+                    if (table.getAttribute('width') || style.width !== 'auto') integrityScore += 0.2;
+                    if (table.getAttribute('align') || style.textAlign !== 'start') integrityScore += 0.2;
+                });
+                
+                return Math.min(integrityScore / tables.length, 1.0);
+            }
+            
+            // 5. RESPONSIVE SCORE ANALYSIS
+            function analyzeResponsiveScore() {
+                // Check for responsive design patterns
+                const hasMediaQueries = Array.from(document.styleSheets).some(sheet => {
+                    try {
+                        return Array.from(sheet.cssRules).some(rule => 
+                            rule.type === CSSRule.MEDIA_RULE
+                        );
+                    } catch (e) {
+                        return false;
+                    }
+                });
+                
+                const hasFlexbox = Array.from(emailContent.querySelectorAll('*')).some(el => {
+                    const style = window.getComputedStyle(el);
+                    return style.display === 'flex' || style.display === 'inline-flex';
+                });
+                
+                const hasResponsiveUnits = emailContent.innerHTML.includes('vw') || 
+                                         emailContent.innerHTML.includes('vh') ||
+                                         emailContent.innerHTML.includes('%');
+                
+                let score = 0;
+                if (hasMediaQueries) score += 0.4;
+                if (hasFlexbox) score += 0.3;
+                if (hasResponsiveUnits) score += 0.3;
+                
+                return score;
+            }
+            
+            return {
+                centeringScore: analyzeCentering(),
+                containerEfficiency: analyzeContainerEfficiency(),
+                cssFidelity: analyzeCSSFidelity(),
+                tableIntegrity: analyzeTableIntegrity(),
+                responsiveScore: analyzeResponsiveScore()
+            };
+        })();
+        "#;
+
+        let result = tab.evaluate(quality_script, false)?;
+        
+        let mut quality = EmailRenderingQuality {
+            email_name: email_name.to_string(),
+            centering_score: 0.0,
+            container_efficiency: 0.0,
+            css_fidelity: 0.0,
+            table_integrity: 0.0,
+            responsive_score: 0.0,
+            overall_quality: 0.0,
+        };
+
+        if let Some(object) = result.value.as_object() {
+            if let Some(centering_score) = object.get("centeringScore").and_then(|v| v.as_f64()) {
+                quality.centering_score = centering_score;
+            }
+            if let Some(container_efficiency) = object.get("containerEfficiency").and_then(|v| v.as_f64()) {
+                quality.container_efficiency = container_efficiency;
+            }
+            if let Some(css_fidelity) = object.get("cssFidelity").and_then(|v| v.as_f64()) {
+                quality.css_fidelity = css_fidelity;
+            }
+            if let Some(table_integrity) = object.get("tableIntegrity").and_then(|v| v.as_f64()) {
+                quality.table_integrity = table_integrity;
+            }
+            if let Some(responsive_score) = object.get("responsiveScore").and_then(|v| v.as_f64()) {
+                quality.responsive_score = responsive_score;
+            }
+        }
+
+        quality.calculate_overall_score();
+        Ok(quality)
+    }
+
+    pub async fn capture_visual_comparison(&self, email_name: &str, modes: &[&str]) -> Result<(), Box<dyn std::error::Error>> {
+        std::fs::create_dir_all("target/visual-diffs")?;
+        
+        for mode in modes {
+            let tab = self.browser.new_tab()?;
+            let url = format!("{}/test/email-gallery/{}?mode={}", self.server_url, email_name, mode);
+            
+            tab.navigate_to(&url)?;
+            tab.wait_until_navigated()?;
+            sleep(Duration::from_millis(1500)).await;
+
+            let screenshot = tab.capture_screenshot(
+                CaptureScreenshotFormatOption::Png,
+                Some(75),
+                None,
+                true,
+            )?;
+            
+            let filename = format!("target/visual-diffs/{}_{}_comparison.png", email_name, mode);
+            std::fs::write(filename, screenshot)?;
+        }
+        
+        Ok(())
+    }
+
+    pub async fn generate_quality_report(&self, qualities: &[EmailRenderingQuality]) -> Result<String, Box<dyn std::error::Error>> {
+        let mut report = String::new();
+        report.push_str("EMAIL RENDERING QUALITY REPORT\n");
+        report.push_str("==============================\n\n");
+        
+        for quality in qualities {
+            report.push_str(&format!("📧 {}\n", quality.email_name.to_uppercase()));
+            report.push_str(&format!("   Overall Quality: {:.1}% {}\n", 
+                quality.overall_quality * 100.0,
+                if quality.overall_quality >= 0.8 { "🟢" } 
+                else if quality.overall_quality >= 0.6 { "🟡" } 
+                else { "🔴" }
+            ));
+            report.push_str(&format!("   ├─ Centering: {:.1}% {}\n", 
+                quality.centering_score * 100.0,
+                if quality.centering_score >= 0.7 { "✅" } else { "❌" }
+            ));
+            report.push_str(&format!("   ├─ Container Efficiency: {:.1}% {}\n", 
+                quality.container_efficiency * 100.0,
+                if quality.container_efficiency >= 0.7 { "✅" } else { "❌" }
+            ));
+            report.push_str(&format!("   ├─ CSS Fidelity: {:.1}% {}\n", 
+                quality.css_fidelity * 100.0,
+                if quality.css_fidelity >= 0.7 { "✅" } else { "❌" }
+            ));
+            report.push_str(&format!("   ├─ Table Integrity: {:.1}% {}\n", 
+                quality.table_integrity * 100.0,
+                if quality.table_integrity >= 0.7 { "✅" } else { "❌" }
+            ));
+            report.push_str(&format!("   └─ Responsive Design: {:.1}% {}\n\n", 
+                quality.responsive_score * 100.0,
+                if quality.responsive_score >= 0.7 { "✅" } else { "❌" }
+            ));
+        }
+        
+        // Summary statistics
+        let avg_quality: f64 = qualities.iter().map(|q| q.overall_quality).sum::<f64>() / qualities.len() as f64;
+        let problematic_emails: Vec<_> = qualities.iter().filter(|q| q.overall_quality < 0.7).collect();
+        
+        report.push_str("SUMMARY\n");
+        report.push_str("=======\n");
+        report.push_str(&format!("Average Quality Score: {:.1}%\n", avg_quality * 100.0));
+        report.push_str(&format!("Emails with Quality Issues: {}/{}\n", problematic_emails.len(), qualities.len()));
+        
+        if !problematic_emails.is_empty() {
+            report.push_str("\nPROBLEMS REQUIRING ATTENTION:\n");
+            for email in problematic_emails {
+                report.push_str(&format!("• {}: {:.1}% overall quality\n", email.email_name, email.overall_quality * 100.0));
+                
+                if email.centering_score < 0.7 {
+                    report.push_str("  - Centering issues (max-width, margin auto patterns)\n");
+                }
+                if email.container_efficiency < 0.7 {
+                    report.push_str("  - Excessive wrapper containers creating visual frames\n");
+                }
+                if email.css_fidelity < 0.7 {
+                    report.push_str("  - CSS properties being stripped or not preserved\n");
+                }
+                if email.table_integrity < 0.7 {
+                    report.push_str("  - Table layout attributes and styling lost\n");
+                }
+                if email.responsive_score < 0.7 {
+                    report.push_str("  - Responsive design patterns not working\n");
+                }
+            }
+        }
+        
+        Ok(report)
+    }
+}
+
+#[tokio::test]
+async fn test_comprehensive_visual_quality_assessment() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let tester = VisualDiffTester::new().await.expect("Failed to create visual diff tester");
+    
+    tester.wait_for_server().await.expect("Server not ready");
+
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+    let mut all_qualities = Vec::new();
+
+    // Measure quality for each problematic email
+    for email_name in &test_emails {
+        println!("Measuring quality for: {}", email_name);
+        
+        let quality = tester.measure_email_quality(email_name).await
+            .expect(&format!("Failed to measure quality for {}", email_name));
+        
+        println!("Quality scores for {}:", email_name);
+        println!("  Overall: {:.1}%", quality.overall_quality * 100.0);
+        println!("  Centering: {:.1}%", quality.centering_score * 100.0);
+        println!("  Container Efficiency: {:.1}%", quality.container_efficiency * 100.0);
+        println!("  CSS Fidelity: {:.1}%", quality.css_fidelity * 100.0);
+        println!("  Table Integrity: {:.1}%", quality.table_integrity * 100.0);
+        println!("  Responsive: {:.1}%", quality.responsive_score * 100.0);
+        
+        all_qualities.push(quality);
+    }
+
+    // Generate and save quality report
+    let report = tester.generate_quality_report(&all_qualities).await
+        .expect("Failed to generate quality report");
+    
+    std::fs::create_dir_all("target/quality-reports").unwrap();
+    std::fs::write("target/quality-reports/current_quality_assessment.txt", &report).unwrap();
+    
+    println!("\n{}", report);
+
+    // Assert minimum quality thresholds based on TODO.md expectations
+    for quality in &all_qualities {
+        // These assertions document current state and will likely fail initially
+        // This is expected behavior - the tests show what needs to be fixed
+        
+        // TODO.md indicates centering is a major issue
+        if quality.email_name.contains("stockholm-film-festival") {
+            // Newsletter emails should have good centering (this will likely fail)
+            assert!(quality.centering_score >= 0.7, 
+                "Stockholm Film Festival should have good centering (found {:.1}%)", 
+                quality.centering_score * 100.0);
+        }
+        
+        // Container efficiency should be reasonable (TODO.md says wrapper count was acceptable)
+        assert!(quality.container_efficiency >= 0.5, 
+            "{} should have reasonable container efficiency (found {:.1}%)", 
+            quality.email_name, quality.container_efficiency * 100.0);
+        
+        // CSS fidelity should be good since fixes were implemented
+        assert!(quality.css_fidelity >= 0.6, 
+            "{} should preserve CSS properties (found {:.1}%)", 
+            quality.email_name, quality.css_fidelity * 100.0);
+    }
+
+    // Overall quality threshold
+    let avg_quality: f64 = all_qualities.iter().map(|q| q.overall_quality).sum::<f64>() / all_qualities.len() as f64;
+    
+    // This assertion will likely fail initially, documenting the current state
+    assert!(avg_quality >= 0.7, 
+        "Average email quality should be at least 70% (found {:.1}%)", avg_quality * 100.0);
+}
+
+#[tokio::test]
+async fn test_visual_comparison_capture() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let tester = VisualDiffTester::new().await.expect("Failed to create visual diff tester");
+    
+    tester.wait_for_server().await.expect("Server not ready");
+
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+    let modes = ["normal", "debug", "split"];
+
+    for email_name in &test_emails {
+        println!("Capturing visual comparisons for: {}", email_name);
+        
+        tester.capture_visual_comparison(email_name, &modes).await
+            .expect(&format!("Failed to capture visual comparison for {}", email_name));
+    }
+
+    // Verify screenshots were created
+    for email_name in &test_emails {
+        for mode in &modes {
+            let screenshot_path = format!("target/visual-diffs/{}_{}_comparison.png", email_name, mode);
+            assert!(Path::new(&screenshot_path).exists(), 
+                "Screenshot should exist: {}", screenshot_path);
+        }
+    }
+    
+    println!("Visual comparison screenshots saved to target/visual-diffs/");
+}
+
+#[tokio::test]
+async fn test_centering_specific_metrics() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let tester = VisualDiffTester::new().await.expect("Failed to create visual diff tester");
+    
+    tester.wait_for_server().await.expect("Server not ready");
+
+    // Focus specifically on centering issues mentioned in TODO.md
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+
+    for email_name in &test_emails {
+        let quality = tester.measure_email_quality(email_name).await
+            .expect(&format!("Failed to measure quality for {}", email_name));
+
+        println!("Centering analysis for {}: {:.1}%", email_name, quality.centering_score * 100.0);
+
+        // Document current centering state (these will likely fail, showing the problem)
+        match *email_name {
+            "stockholm-film-festival" => {
+                // Newsletter should be well-centered
+                assert!(quality.centering_score >= 0.8, 
+                    "Newsletter email should be well-centered (found {:.1}%)", 
+                    quality.centering_score * 100.0);
+            }
+            "bilprovningen" => {
+                // Service notification should have reasonable centering
+                assert!(quality.centering_score >= 0.7, 
+                    "Service notification should be reasonably centered (found {:.1}%)", 
+                    quality.centering_score * 100.0);
+            }
+            "max-dead-rising" => {
+                // Promotional email should be centered
+                assert!(quality.centering_score >= 0.7, 
+                    "Promotional email should be centered (found {:.1}%)", 
+                    quality.centering_score * 100.0);
+            }
+            _ => {}
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_container_efficiency_metrics() {
+    let _notmuch_setup = NotmuchTestSetup::new().await.expect("Failed to set up notmuch");
+    let tester = VisualDiffTester::new().await.expect("Failed to create visual diff tester");
+    
+    tester.wait_for_server().await.expect("Server not ready");
+
+    let test_emails = ["bilprovningen", "stockholm-film-festival", "max-dead-rising"];
+
+    for email_name in &test_emails {
+        let quality = tester.measure_email_quality(email_name).await
+            .expect(&format!("Failed to measure quality for {}", email_name));
+
+        println!("Container efficiency for {}: {:.1}%", email_name, quality.container_efficiency * 100.0);
+
+        // According to TODO.md, wrapper count was acceptable but visual frames are an issue
+        assert!(quality.container_efficiency >= 0.6, 
+            "{} should have good container efficiency to avoid visual frames (found {:.1}%)", 
+            email_name, quality.container_efficiency * 100.0);
+    }
+}

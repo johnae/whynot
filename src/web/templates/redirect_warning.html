@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}External Link Warning - Whynot Mail{% endblock %}
+
+{% block content %}
+<div class="redirect-warning">
+    <div class="warning-container">
+        <div class="warning-icon">
+            ⚠️
+        </div>
+        <h1>External Link Warning</h1>
+        <p class="warning-message">
+            You are about to visit an external website. Please verify the URL before proceeding.
+        </p>
+        
+        <div class="url-display">
+            <div class="url-label">Destination:</div>
+            <div class="url-value">{{ url }}</div>
+            <div class="domain-info">
+                <span class="domain-label">Domain:</span>
+                <span class="domain-value">{{ domain }}</span>
+            </div>
+        </div>
+        
+        <div class="security-notice">
+            <h3>Security Notice</h3>
+            <ul>
+                <li>This link will open in a new window</li>
+                <li>Always verify the URL matches your expectations</li>
+                <li>Be cautious of suspicious domains or phishing attempts</li>
+                <li>Do not enter sensitive information unless you trust the destination</li>
+            </ul>
+        </div>
+        
+        <div class="action-buttons">
+            <a href="javascript:window.close()" class="btn btn-secondary">
+                Cancel
+            </a>
+            <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" id="proceed-btn">
+                Proceed to Site
+            </a>
+        </div>
+        
+        <div class="footer-note">
+            <small>This warning page helps protect you from potentially malicious links.</small>
+        </div>
+    </div>
+</div>
+
+<style>
+.redirect-warning {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.warning-container {
+    max-width: 600px;
+    width: 100%;
+    background-color: var(--bg-secondary);
+    border: 2px solid #f97316;
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.warning-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.warning-container h1 {
+    color: #f97316;
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+
+.warning-message {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    line-height: 1.6;
+}
+
+.url-display {
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 24px 0;
+    text-align: left;
+}
+
+.url-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.url-value {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    color: var(--text-link);
+    word-break: break-all;
+    background-color: var(--bg-secondary);
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin-bottom: 12px;
+}
+
+.domain-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.domain-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.domain-value {
+    font-weight: 600;
+    color: #f97316;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.security-notice {
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 24px 0;
+    text-align: left;
+}
+
+.security-notice h3 {
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.security-notice ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.security-notice li {
+    padding: 6px 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+    position: relative;
+    padding-left: 20px;
+}
+
+.security-notice li::before {
+    content: "•";
+    color: #f97316;
+    font-weight: bold;
+    position: absolute;
+    left: 0;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin: 32px 0 16px 0;
+}
+
+.btn {
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-primary {
+    background-color: #f97316;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #ea580c;
+    color: white;
+}
+
+.btn-secondary {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.footer-note {
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-top: 16px;
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .warning-container {
+    background-color: var(--bg-tertiary);
+    border-color: #f97316;
+}
+
+[data-theme="dark"] .url-display,
+[data-theme="dark"] .security-notice {
+    background-color: var(--bg-secondary);
+}
+
+[data-theme="dark"] .url-value {
+    background-color: var(--bg-primary);
+}
+</style>
+
+<script>
+// Add click tracking for security monitoring
+document.getElementById('proceed-btn').addEventListener('click', function() {
+    // Log the redirect for security monitoring
+    fetch('/api/log-redirect', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            url: '{{ url }}',
+            domain: '{{ domain }}',
+            timestamp: new Date().toISOString(),
+            user_confirmed: true
+        })
+    }).catch(() => {
+        // Silent fail - don't block the redirect if logging fails
+    });
+});
+
+// Close window with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        window.close();
+    }
+});
+</script>
+{% endblock %}

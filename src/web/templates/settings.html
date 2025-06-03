@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Whynot Mail{% endblock %}
+
+{% block content %}
+<div class="settings">
+    <h1>Settings</h1>
+    
+    <div class="settings-section">
+        <h2>Appearance</h2>
+        <div class="setting-item">
+            <span>Current theme: {{ theme }}</span>
+            <form method="post" action="/settings/theme" style="display: inline;">
+                <button type="submit" class="button">Toggle Theme</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.settings h1 {
+    font-size: 32px;
+    font-weight: 400;
+    margin-bottom: 24px;
+}
+
+.settings-section {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.settings-section h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.button {
+    background-color: var(--accent);
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.button:hover {
+    opacity: 0.8;
+}
+</style>
+{% endblock %}

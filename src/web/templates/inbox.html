@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Inbox - Whynot Mail{% endblock %}
+
+{% block content %}
+<div class="inbox">
+    <div class="inbox-header">
+        <h1>Inbox</h1>
+        <div class="search-and-filters">
+            <form action="/search" method="get" class="search-form">
+                <input type="text" name="q" placeholder="Search messages..." class="search-input">
+                <button type="submit" class="search-button">Search</button>
+            </form>
+            <div class="tag-filters">
+                <button class="filter-toggle" onclick="toggleTagFilter()">Filter by Tags</button>
+                <div id="tag-filter-dropdown" class="tag-filter-dropdown" style="display: none;">
+                    <div class="tag-filter-header">
+                        <span>Filter by tags:</span>
+                        <button onclick="clearAllTagFilters()" class="clear-filters">Clear All</button>
+                    </div>
+                    <div id="tag-list" class="tag-list">
+                        <!-- Tags loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if !active_tags.is_empty() || search_query.is_some() %}
+    <div class="active-filters">
+        <span class="filter-label">Active filters:</span>
+        <div class="active-filter-tags">
+            {% if let Some(query) = search_query %}
+            <span class="active-filter-tag">
+                Search: "{{ query }}" 
+                <button onclick="clearSearchQuery()" class="remove-filter">×</button>
+            </span>
+            {% endif %}
+            {% for tag in active_tags %}
+            <span class="active-filter-tag">
+                {{ tag }} 
+                <button onclick="removeServerTagFilter('{{ tag }}')" class="remove-filter">×</button>
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="message-list">
+        {% for message in messages %}
+        <div class="message-item">
+            <div class="message-header">
+                <span class="sender">{{ message.authors }}</span>
+                <span class="date">{{ message.date_relative }}</span>
+            </div>
+            <div class="subject">
+                <a href="/thread/{{ message.thread_id() }}">{{ message.subject }}</a>
+            </div>
+            <div class="tags">
+                {% for tag in message.tags %}
+                <span class="tag">{{ tag }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if messages.is_empty() %}
+        <div class="empty-state">
+            <p>No messages found.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Tag filtering functionality
+
+async function loadTags() {
+    try {
+        console.log('Loading tags from /tags endpoint...');
+        const response = await fetch('/tags');
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Tags data received:', data);
+        
+        const tagList = document.getElementById('tag-list');
+        
+        if (!tagList) {
+            console.error('Could not find tag-list element');
+            return;
+        }
+        
+        tagList.innerHTML = '';
+        
+        if (!data.tags || data.tags.length === 0) {
+            tagList.innerHTML = '<div class="no-tags">No tags available</div>';
+            return;
+        }
+        
+        // Get current active tags from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentQuery = urlParams.get('q') || '';
+        const activeTags = new Set();
+        const tagMatches = currentQuery.match(/\btag:(\S+)/g) || [];
+        tagMatches.forEach(match => {
+            const activeTag = match.replace('tag:', '');
+            activeTags.add(activeTag);
+        });
+        
+        data.tags.forEach(tag => {
+            const tagButton = document.createElement('button');
+            tagButton.className = 'tag-pill';
+            if (activeTags.has(tag)) {
+                tagButton.classList.add('selected');
+            }
+            tagButton.textContent = tag;
+            tagButton.onclick = () => toggleTag(tag, tagButton);
+            tagList.appendChild(tagButton);
+        });
+        
+        console.log(`Loaded ${data.tags.length} tags`);
+    } catch (error) {
+        console.error('Failed to load tags:', error);
+        const tagList = document.getElementById('tag-list');
+        if (tagList) {
+            tagList.innerHTML = '<div class="error">Failed to load tags</div>';
+        }
+    }
+}
+
+function toggleTagFilter() {
+    const dropdown = document.getElementById('tag-filter-dropdown');
+    if (dropdown.style.display === 'none' || dropdown.style.display === '') {
+        dropdown.style.display = 'block';
+        loadTags(); // Load tags when opening dropdown
+    } else {
+        dropdown.style.display = 'none';
+    }
+}
+
+function toggleTag(tag, button) {
+    console.log('Toggling tag:', tag);
+    
+    // Get current active tags from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentQuery = urlParams.get('q') || '';
+    
+    // Parse existing tags from the query
+    const existingTags = new Set();
+    const tagMatches = currentQuery.match(/\btag:(\S+)/g) || [];
+    tagMatches.forEach(match => {
+        const existingTag = match.replace('tag:', '');
+        existingTags.add(existingTag);
+    });
+    
+    // Toggle the tag
+    if (existingTags.has(tag)) {
+        existingTags.delete(tag);
+        button.classList.remove('selected');
+    } else {
+        existingTags.add(tag);
+        button.classList.add('selected');
+    }
+    
+    console.log('Updated tags:', Array.from(existingTags));
+    
+    // Apply the new filter set
+    if (existingTags.size === 0) {
+        window.location.href = '/inbox';
+    } else {
+        const tagQueries = Array.from(existingTags).map(t => `tag:${t}`);
+        const query = tagQueries.join(' AND ');
+        const url = `/search?q=${encodeURIComponent(query)}`;
+        console.log('Navigating to:', url);
+        window.location.href = url;
+    }
+}
+
+function updateActiveFilters() {
+    // This is now handled by navigation/page reload
+    // The active filters are server-rendered
+}
+
+function removeTagFilter(tag) {
+    // This is now unused - we use removeServerTagFilter instead
+}
+
+function clearAllTagFilters() {
+    // Clear all filters by going back to inbox
+    window.location.href = '/inbox';
+}
+
+function applyTagFilters() {
+    // This is now handled directly in toggleTag
+}
+
+function removeServerTagFilter(tag) {
+    // Get current URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Remove the specific tag from URL parameters
+    const currentQ = urlParams.get('q') || '';
+    const tagPattern = new RegExp(`\\btag:${tag}\\b`, 'g');
+    const newQ = currentQ.replace(tagPattern, '').replace(/\s+AND\s+/g, ' AND ').replace(/^\s*AND\s*|\s*AND\s*$/g, '').trim();
+    
+    if (newQ) {
+        urlParams.set('q', newQ);
+    } else {
+        urlParams.delete('q');
+    }
+    
+    // Navigate to updated URL
+    const newUrl = urlParams.toString() ? `/search?${urlParams.toString()}` : '/inbox';
+    window.location.href = newUrl;
+}
+
+function clearSearchQuery() {
+    // Get current URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Remove only the text search, keep tag filters
+    const currentQ = urlParams.get('q') || '';
+    const tagMatches = currentQ.match(/\btag:\S+/g) || [];
+    
+    if (tagMatches.length > 0) {
+        urlParams.set('q', tagMatches.join(' AND '));
+        window.location.href = `/search?${urlParams.toString()}`;
+    } else {
+        window.location.href = '/inbox';
+    }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('tag-filter-dropdown');
+    const filterToggle = document.querySelector('.filter-toggle');
+    
+    if (!dropdown.contains(event.target) && !filterToggle.contains(event.target)) {
+        dropdown.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}
