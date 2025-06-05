@@ -76,7 +76,7 @@ Quite a bit, actually:
 
 ## Development
 
-This project uses a test-driven approach with `devenv.sh` for reproducible environments:
+This project uses a test-driven approach with `devenv.sh` for reproducible environments. For detailed development guidelines, workflow practices, and project structure, please see [DEVELOPMENT.md](./DEVELOPMENT.md).
 
 ```bash
 # Load development environment (with direnv)
