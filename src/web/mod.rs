@@ -1,9 +1,11 @@
 use crate::body::BodyContent;
 use crate::client::NotmuchClient;
+use crate::config::UserConfig;
+use crate::mail_sender::{MailSender, MessageBuilder};
 use crate::search::SearchItem;
 use askama_axum::{IntoResponse, Template};
 use axum::{
-    Json, Router,
+    Form, Json, Router,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode, header},
     response::Redirect,
@@ -20,7 +22,9 @@ use content_renderer::{RenderedContent, render_message_content};
 #[derive(Clone)]
 pub struct AppState {
     pub client: Arc<dyn NotmuchClient>,
+    pub mail_sender: Option<Arc<dyn MailSender>>,
     pub config: WebConfig,
+    pub user_config: UserConfig,
 }
 
 #[derive(Clone)]
@@ -64,6 +68,9 @@ pub fn create_app(state: AppState) -> Router {
             "/test/email-gallery/:email_name",
             get(test_email_viewer_handler),
         )
+        .route("/compose", get(compose_get_handler).post(compose_post_handler))
+        .route("/thread/:id/reply", get(reply_get_handler).post(reply_post_handler))
+        .route("/thread/:id/forward", get(forward_get_handler).post(forward_post_handler))
         .nest_service("/static", ServeDir::new("src/web/static"))
         .with_state(state)
 }
@@ -979,4 +986,620 @@ fn sanitize_filename(filename: &str) -> String {
         .next_back()
         .unwrap_or("attachment")
         .to_string()
+}
+
+// Compose/Reply/Forward structures and handlers
+#[derive(Template)]
+#[template(path = "compose.html")]
+struct ComposeTemplate {
+    title: String,
+    action_url: String,
+    back_url: String,
+    mode: String,
+    to: String,
+    cc: String,
+    bcc: String,
+    subject: String,
+    body: String,
+    in_reply_to: String,
+    references: String,
+    original_message_id: String,
+    error: Option<String>,
+    theme: String,
+}
+
+#[derive(Deserialize)]
+struct ComposeFormData {
+    to: String,
+    cc: Option<String>,
+    bcc: Option<String>,
+    subject: String,
+    body: String,
+    in_reply_to: Option<String>,
+    references: Option<String>,
+    original_message_id: Option<String>,
+}
+
+async fn compose_get_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let theme = get_theme_from_headers(&headers);
+    
+    // Check if mail sending is configured
+    if state.mail_sender.is_none() {
+        return ThreadErrorTemplate {
+            message: "Mail sending is not configured. Please configure msmtp in your settings.".to_string(),
+            theme,
+        }
+        .into_response();
+    }
+    
+    // Get default from address (currently unused but may be displayed in UI later)
+    let _from_email = state.user_config.email.as_deref().unwrap_or("user@example.com");
+    
+    ComposeTemplate {
+        title: "Compose New Email".to_string(),
+        action_url: "/compose".to_string(),
+        back_url: "/inbox".to_string(),
+        mode: "compose".to_string(),
+        to: "".to_string(),
+        cc: "".to_string(),
+        bcc: "".to_string(),
+        subject: "".to_string(),
+        body: format!("\n\n--\n{}", state.user_config.signature.as_deref().unwrap_or("")),
+        in_reply_to: "".to_string(),
+        references: "".to_string(),
+        original_message_id: "".to_string(),
+        error: None,
+        theme,
+    }
+    .into_response()
+}
+
+async fn compose_post_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form_data): Form<ComposeFormData>,
+) -> impl IntoResponse {
+    let theme = get_theme_from_headers(&headers);
+    
+    // Check if mail sending is configured
+    let mail_sender = match &state.mail_sender {
+        Some(sender) => sender,
+        None => {
+            return ThreadErrorTemplate {
+                message: "Mail sending is not configured.".to_string(),
+                theme,
+            }
+            .into_response();
+        }
+    };
+    
+    // Build the message
+    let mut builder = MessageBuilder::new()
+        .to(form_data.to.clone())
+        .subject(form_data.subject.clone())
+        .body(form_data.body.clone());
+    
+    // Add optional fields
+    if let Some(from_email) = &state.user_config.email {
+        builder = builder.from(from_email.clone());
+    }
+    
+    if let Some(cc) = form_data.cc.as_ref() {
+        if !cc.is_empty() {
+            builder = builder.cc(cc.clone());
+        }
+    }
+    
+    if let Some(bcc) = form_data.bcc.as_ref() {
+        if !bcc.is_empty() {
+            builder = builder.bcc(bcc.clone());
+        }
+    }
+    
+    // Set reply headers if present
+    if let Some(in_reply_to) = form_data.in_reply_to.as_ref() {
+        if !in_reply_to.is_empty() {
+            builder = builder.in_reply_to(in_reply_to.clone());
+        }
+    }
+    
+    if let Some(references) = form_data.references.as_ref() {
+        if !references.is_empty() {
+            // Split references and add each one
+            for reference in references.split_whitespace() {
+                builder = builder.add_reference(reference.to_string());
+            }
+        }
+    }
+    
+    // Build and send the message
+    match builder.build() {
+        Ok(message) => {
+            match mail_sender.send(message).await {
+                Ok(message_id) => {
+                    tracing::info!("Successfully sent email with ID: {}", message_id);
+                    // Redirect to inbox with success message
+                    // TODO: Add flash message support for success notification
+                    Redirect::to("/inbox").into_response()
+                }
+                Err(e) => {
+                    tracing::error!("Failed to send email: {}", e);
+                    ComposeTemplate {
+                        title: "Compose New Email".to_string(),
+                        action_url: "/compose".to_string(),
+                        back_url: "/inbox".to_string(),
+                        mode: "compose".to_string(),
+                        to: form_data.to,
+                        cc: form_data.cc.unwrap_or_default(),
+                        bcc: form_data.bcc.unwrap_or_default(),
+                        subject: form_data.subject,
+                        body: form_data.body,
+                        in_reply_to: form_data.in_reply_to.unwrap_or_default(),
+                        references: form_data.references.unwrap_or_default(),
+                        original_message_id: form_data.original_message_id.unwrap_or_default(),
+                        error: Some(format!("Failed to send email: {}", e)),
+                        theme,
+                    }
+                    .into_response()
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!("Failed to build email: {}", e);
+            ComposeTemplate {
+                title: "Compose New Email".to_string(),
+                action_url: "/compose".to_string(),
+                back_url: "/inbox".to_string(),
+                mode: "compose".to_string(),
+                to: form_data.to,
+                cc: form_data.cc.unwrap_or_default(),
+                bcc: form_data.bcc.unwrap_or_default(),
+                subject: form_data.subject,
+                body: form_data.body,
+                in_reply_to: form_data.in_reply_to.unwrap_or_default(),
+                references: form_data.references.unwrap_or_default(),
+                original_message_id: form_data.original_message_id.unwrap_or_default(),
+                error: Some(format!("Failed to build email: {}", e)),
+                theme,
+            }
+            .into_response()
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct ReplyParams {
+    message: usize,
+    all: Option<bool>,
+}
+
+async fn reply_get_handler(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    Query(params): Query<ReplyParams>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let theme = get_theme_from_headers(&headers);
+    
+    // Check if mail sending is configured
+    if state.mail_sender.is_none() {
+        return ThreadErrorTemplate {
+            message: "Mail sending is not configured. Please configure msmtp in your settings.".to_string(),
+            theme,
+        }
+        .into_response();
+    }
+    
+    // Fetch the thread
+    match state.client.show(&format!("thread:{}", thread_id)).await {
+        Ok(thread) => {
+            let messages = thread.get_messages();
+            
+            // Get the specific message to reply to
+            if let Some(original_message) = messages.get(params.message) {
+                let reply_all = params.all.unwrap_or(false);
+                
+                // Determine recipients
+                let to = original_message.headers.from.clone();
+                let mut cc = String::new();
+                
+                if reply_all {
+                    // Add original To recipients to CC
+                    cc = original_message.headers.to.clone();
+                    
+                    // CC field is not available in headers, skip for now
+                    // TODO: Parse CC from raw message headers if needed
+                    
+                    // Remove self from CC if present
+                    if let Some(user_email) = &state.user_config.email {
+                        cc = cc.split(',')
+                            .map(|s| s.trim())
+                            .filter(|email| !email.contains(user_email))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                    }
+                }
+                
+                // Prepare subject with Re: prefix if not already present
+                let subject = if original_message.headers.subject.starts_with("Re: ") {
+                    original_message.headers.subject.clone()
+                } else {
+                    format!("Re: {}", original_message.headers.subject)
+                };
+                
+                // Build reply body with quoted original
+                let quoted_body = original_message.get_text_content()
+                    .unwrap_or_default()
+                    .lines()
+                    .map(|line| format!("> {}", line))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                
+                let body = format!(
+                    "\n\nOn {}, {} wrote:\n{}\n\n--\n{}",
+                    original_message.date_relative,
+                    original_message.headers.from,
+                    quoted_body,
+                    state.user_config.signature.as_deref().unwrap_or("")
+                );
+                
+                // Extract message ID for In-Reply-To
+                let in_reply_to = original_message.headers.additional.get("message-id")
+                    .cloned()
+                    .unwrap_or_else(|| format!("<{}@unknown>", original_message.id));
+                
+                // Build references chain
+                let mut references = Vec::new();
+                if let Some(orig_refs) = original_message.headers.additional.get("references") {
+                    references.push(orig_refs.clone());
+                }
+                references.push(in_reply_to.clone());
+                let references_str = references.join(" ");
+                
+                let title = if reply_all {
+                    "Reply All".to_string()
+                } else {
+                    "Reply".to_string()
+                };
+                
+                ComposeTemplate {
+                    title,
+                    action_url: format!("/thread/{}/reply?message={}&all={}", thread_id, params.message, reply_all),
+                    back_url: format!("/thread/{}", thread_id),
+                    mode: if reply_all { "reply_all".to_string() } else { "reply".to_string() },
+                    to,
+                    cc,
+                    bcc: "".to_string(),
+                    subject,
+                    body,
+                    in_reply_to,
+                    references: references_str,
+                    original_message_id: "".to_string(),
+                    error: None,
+                    theme,
+                }
+                .into_response()
+            } else {
+                ThreadErrorTemplate {
+                    message: "Message not found in thread".to_string(),
+                    theme,
+                }
+                .into_response()
+            }
+        }
+        Err(e) => {
+            tracing::error!("Failed to load thread {}: {}", thread_id, e);
+            ThreadErrorTemplate {
+                message: format!("Failed to load thread: {}", e),
+                theme,
+            }
+            .into_response()
+        }
+    }
+}
+
+async fn reply_post_handler(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    Query(params): Query<ReplyParams>,
+    headers: HeaderMap,
+    Form(form_data): Form<ComposeFormData>,
+) -> impl IntoResponse {
+    let theme = get_theme_from_headers(&headers);
+    
+    // Check if mail sending is configured
+    let mail_sender = match &state.mail_sender {
+        Some(sender) => sender,
+        None => {
+            return ThreadErrorTemplate {
+                message: "Mail sending is not configured.".to_string(),
+                theme,
+            }
+            .into_response();
+        }
+    };
+    
+    // Build the reply message
+    let mut builder = MessageBuilder::new()
+        .to(form_data.to.clone())
+        .subject(form_data.subject.clone())
+        .body(form_data.body.clone());
+    
+    // Add optional fields
+    if let Some(from_email) = &state.user_config.email {
+        builder = builder.from(from_email.clone());
+    }
+    
+    if let Some(cc) = form_data.cc.as_ref() {
+        if !cc.is_empty() {
+            builder = builder.cc(cc.clone());
+        }
+    }
+    
+    if let Some(bcc) = form_data.bcc.as_ref() {
+        if !bcc.is_empty() {
+            builder = builder.bcc(bcc.clone());
+        }
+    }
+    
+    // Set reply headers
+    if let Some(in_reply_to) = form_data.in_reply_to.as_ref() {
+        if !in_reply_to.is_empty() {
+            builder = builder.in_reply_to(in_reply_to.clone());
+        }
+    }
+    
+    if let Some(references) = form_data.references.as_ref() {
+        if !references.is_empty() {
+            // Split references and add each one
+            for reference in references.split_whitespace() {
+                builder = builder.add_reference(reference.to_string());
+            }
+        }
+    }
+    
+    // Build and send the message
+    match builder.build() {
+        Ok(message) => {
+            match mail_sender.send(message).await {
+                Ok(message_id) => {
+                    tracing::info!("Successfully sent reply with ID: {}", message_id);
+                    // Redirect back to the thread
+                    Redirect::to(&format!("/thread/{}", thread_id)).into_response()
+                }
+                Err(e) => {
+                    tracing::error!("Failed to send reply: {}", e);
+                    let reply_all = params.all.unwrap_or(false);
+                    ComposeTemplate {
+                        title: if reply_all { "Reply All".to_string() } else { "Reply".to_string() },
+                        action_url: format!("/thread/{}/reply?message={}&all={}", thread_id, params.message, reply_all),
+                        back_url: format!("/thread/{}", thread_id),
+                        mode: if reply_all { "reply_all".to_string() } else { "reply".to_string() },
+                        to: form_data.to,
+                        cc: form_data.cc.unwrap_or_default(),
+                        bcc: form_data.bcc.unwrap_or_default(),
+                        subject: form_data.subject,
+                        body: form_data.body,
+                        in_reply_to: form_data.in_reply_to.unwrap_or_default(),
+                        references: form_data.references.unwrap_or_default(),
+                        original_message_id: form_data.original_message_id.unwrap_or_default(),
+                        error: Some(format!("Failed to send reply: {}", e)),
+                        theme,
+                    }
+                    .into_response()
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!("Failed to build reply: {}", e);
+            let reply_all = params.all.unwrap_or(false);
+            ComposeTemplate {
+                title: if reply_all { "Reply All".to_string() } else { "Reply".to_string() },
+                action_url: format!("/thread/{}/reply?message={}&all={}", thread_id, params.message, reply_all),
+                back_url: format!("/thread/{}", thread_id),
+                mode: if reply_all { "reply_all".to_string() } else { "reply".to_string() },
+                to: form_data.to,
+                cc: form_data.cc.unwrap_or_default(),
+                bcc: form_data.bcc.unwrap_or_default(),
+                subject: form_data.subject,
+                body: form_data.body,
+                in_reply_to: form_data.in_reply_to.unwrap_or_default(),
+                references: form_data.references.unwrap_or_default(),
+                original_message_id: form_data.original_message_id.unwrap_or_default(),
+                error: Some(format!("Failed to build reply: {}", e)),
+                theme,
+            }
+            .into_response()
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct ForwardParams {
+    message: usize,
+}
+
+async fn forward_get_handler(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    Query(params): Query<ForwardParams>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let theme = get_theme_from_headers(&headers);
+    
+    // Check if mail sending is configured
+    if state.mail_sender.is_none() {
+        return ThreadErrorTemplate {
+            message: "Mail sending is not configured. Please configure msmtp in your settings.".to_string(),
+            theme,
+        }
+        .into_response();
+    }
+    
+    // Fetch the thread
+    match state.client.show(&format!("thread:{}", thread_id)).await {
+        Ok(thread) => {
+            let messages = thread.get_messages();
+            
+            // Get the specific message to forward
+            if let Some(original_message) = messages.get(params.message) {
+                // Prepare subject with Fwd: prefix if not already present
+                let subject = if original_message.headers.subject.starts_with("Fwd: ") {
+                    original_message.headers.subject.clone()
+                } else {
+                    format!("Fwd: {}", original_message.headers.subject)
+                };
+                
+                // Build forward body with original message
+                let original_text = original_message.get_text_content()
+                    .unwrap_or("[No text content]");
+                
+                let body = format!(
+                    "\n\n---------- Forwarded message ----------\nFrom: {}\nDate: {}\nSubject: {}\nTo: {}\n\n{}\n\n--\n{}",
+                    original_message.headers.from,
+                    original_message.date_relative,
+                    original_message.headers.subject,
+                    original_message.headers.to,
+                    original_text,
+                    state.user_config.signature.as_deref().unwrap_or("")
+                );
+                
+                // Store original message ID for attachment forwarding (future feature)
+                let original_message_id = original_message.id.clone();
+                
+                ComposeTemplate {
+                    title: "Forward Email".to_string(),
+                    action_url: format!("/thread/{}/forward?message={}", thread_id, params.message),
+                    back_url: format!("/thread/{}", thread_id),
+                    mode: "forward".to_string(),
+                    to: "".to_string(), // User needs to fill this in
+                    cc: "".to_string(),
+                    bcc: "".to_string(),
+                    subject,
+                    body,
+                    in_reply_to: "".to_string(),
+                    references: "".to_string(),
+                    original_message_id,
+                    error: None,
+                    theme,
+                }
+                .into_response()
+            } else {
+                ThreadErrorTemplate {
+                    message: "Message not found in thread".to_string(),
+                    theme,
+                }
+                .into_response()
+            }
+        }
+        Err(e) => {
+            tracing::error!("Failed to load thread {}: {}", thread_id, e);
+            ThreadErrorTemplate {
+                message: format!("Failed to load thread: {}", e),
+                theme,
+            }
+            .into_response()
+        }
+    }
+}
+
+async fn forward_post_handler(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    Query(params): Query<ForwardParams>,
+    headers: HeaderMap,
+    Form(form_data): Form<ComposeFormData>,
+) -> impl IntoResponse {
+    let theme = get_theme_from_headers(&headers);
+    
+    // Check if mail sending is configured
+    let mail_sender = match &state.mail_sender {
+        Some(sender) => sender,
+        None => {
+            return ThreadErrorTemplate {
+                message: "Mail sending is not configured.".to_string(),
+                theme,
+            }
+            .into_response();
+        }
+    };
+    
+    // Build the forward message
+    let mut builder = MessageBuilder::new()
+        .to(form_data.to.clone())
+        .subject(form_data.subject.clone())
+        .body(form_data.body.clone());
+    
+    // Add optional fields
+    if let Some(from_email) = &state.user_config.email {
+        builder = builder.from(from_email.clone());
+    }
+    
+    if let Some(cc) = form_data.cc.as_ref() {
+        if !cc.is_empty() {
+            builder = builder.cc(cc.clone());
+        }
+    }
+    
+    if let Some(bcc) = form_data.bcc.as_ref() {
+        if !bcc.is_empty() {
+            builder = builder.bcc(bcc.clone());
+        }
+    }
+    
+    // Build and send the message
+    match builder.build() {
+        Ok(message) => {
+            match mail_sender.send(message).await {
+                Ok(message_id) => {
+                    tracing::info!("Successfully forwarded email with ID: {}", message_id);
+                    // Redirect back to the thread
+                    Redirect::to(&format!("/thread/{}", thread_id)).into_response()
+                }
+                Err(e) => {
+                    tracing::error!("Failed to forward email: {}", e);
+                    ComposeTemplate {
+                        title: "Forward Email".to_string(),
+                        action_url: format!("/thread/{}/forward?message={}", thread_id, params.message),
+                        back_url: format!("/thread/{}", thread_id),
+                        mode: "forward".to_string(),
+                        to: form_data.to,
+                        cc: form_data.cc.unwrap_or_default(),
+                        bcc: form_data.bcc.unwrap_or_default(),
+                        subject: form_data.subject,
+                        body: form_data.body,
+                        in_reply_to: form_data.in_reply_to.unwrap_or_default(),
+                        references: form_data.references.unwrap_or_default(),
+                        original_message_id: form_data.original_message_id.unwrap_or_default(),
+                        error: Some(format!("Failed to forward email: {}", e)),
+                        theme,
+                    }
+                    .into_response()
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!("Failed to build forward message: {}", e);
+            ComposeTemplate {
+                title: "Forward Email".to_string(),
+                action_url: format!("/thread/{}/forward?message={}", thread_id, params.message),
+                back_url: format!("/thread/{}", thread_id),
+                mode: "forward".to_string(),
+                to: form_data.to,
+                cc: form_data.cc.unwrap_or_default(),
+                bcc: form_data.bcc.unwrap_or_default(),
+                subject: form_data.subject,
+                body: form_data.body,
+                in_reply_to: form_data.in_reply_to.unwrap_or_default(),
+                references: form_data.references.unwrap_or_default(),
+                original_message_id: form_data.original_message_id.unwrap_or_default(),
+                error: Some(format!("Failed to build forward message: {}", e)),
+                theme,
+            }
+            .into_response()
+        }
+    }
 }

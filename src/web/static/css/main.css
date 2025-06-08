@@ -118,6 +118,40 @@ main {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.inbox-header h1 {
+    margin: 0;
+}
+
+.inbox-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.compose-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    background-color: var(--accent);
+    color: white;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: opacity 0.2s;
+}
+
+.compose-button:hover {
+    opacity: 0.8;
+    text-decoration: none;
+}
+
+.compose-icon {
+    font-size: 16px;
 }
 
 /* Search form */

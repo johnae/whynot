@@ -1,6 +1,7 @@
 use clap::Parser;
 use whynot::client::create_client;
 use whynot::config::{Config, CliArgs};
+use whynot::mail_sender::create_mail_sender;
 use whynot::web::{AppState, WebConfig, create_app};
 
 #[tokio::main]
@@ -57,6 +58,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Create mail sender if configured
+    let mail_sender = if let Ok(mail_sender_config) = config.to_mail_sender_config() {
+        tracing::info!("Creating mail sender...");
+        match create_mail_sender(mail_sender_config) {
+            Ok(sender) => {
+                // Test the mail sender connection
+                match sender.test_connection().await {
+                    Ok(()) => {
+                        tracing::info!("Mail sender connection successful");
+                        Some(sender)
+                    }
+                    Err(e) => {
+                        tracing::warn!("Mail sender test failed: {}. Mail sending will be disabled.", e);
+                        None
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to create mail sender: {}. Mail sending will be disabled.", e);
+                None
+            }
+        }
+    } else {
+        tracing::info!("Mail sending not configured");
+        None
+    };
+
     // Create web configuration from unified config
     let web_config = WebConfig {
         bind_address: config.bind_address()?,
@@ -66,7 +94,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let state = AppState {
         client: std::sync::Arc::from(client),
+        mail_sender: mail_sender.map(std::sync::Arc::from),
         config: web_config.clone(),
+        user_config: config.user.clone(),
     };
 
     // Create the application

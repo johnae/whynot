@@ -93,7 +93,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let state = AppState {
         client,
+        mail_sender: None,
         config: config.clone(),
+        user_config: whynot::config::UserConfig::default(),
     };
 
     // Create the application

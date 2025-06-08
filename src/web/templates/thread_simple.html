@@ -16,6 +16,17 @@
                 <div class="message-from">
                     <strong>{{ msg_with_content.message.headers.from }}</strong>
                 </div>
+                <div class="message-actions">
+                    <a href="/thread/{{ msg_with_content.thread_id }}/reply?message={{ msg_with_content.message_index }}" class="message-action-btn reply-btn">
+                        ↩️ Reply
+                    </a>
+                    <a href="/thread/{{ msg_with_content.thread_id }}/reply?message={{ msg_with_content.message_index }}&all=true" class="message-action-btn reply-all-btn">
+                        ↩️ Reply All
+                    </a>
+                    <a href="/thread/{{ msg_with_content.thread_id }}/forward?message={{ msg_with_content.message_index }}" class="message-action-btn forward-btn">
+                        ➡️ Forward
+                    </a>
+                </div>
                 <div class="message-date">
                     {{ msg_with_content.message.date_relative }}
                 </div>
@@ -159,7 +170,35 @@
 .message-meta {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.message-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.message-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.message-action-btn:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+    border-color: var(--accent);
+    text-decoration: none;
 }
 
 .message-from {
