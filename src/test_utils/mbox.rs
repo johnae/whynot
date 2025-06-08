@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
-use mail_builder::MessageBuilder;
+use mail_builder::{MessageBuilder, headers::raw::Raw};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct EmailMessage {
@@ -13,6 +14,7 @@ pub struct EmailMessage {
     pub message_id: Option<String>,
     pub in_reply_to: Option<String>,
     pub attachments: Vec<Attachment>,
+    pub additional_headers: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +44,7 @@ impl EmailMessage {
             message_id: None,
             in_reply_to: None,
             attachments: Vec::new(),
+            additional_headers: HashMap::new(),
         }
     }
 
@@ -95,6 +98,11 @@ impl EmailMessage {
 
     pub fn with_in_reply_to(mut self, id: impl Into<String>) -> Self {
         self.in_reply_to = Some(id.into());
+        self
+    }
+
+    pub fn with_additional_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.additional_headers.insert(name.into(), value.into());
         self
     }
 
@@ -331,6 +339,11 @@ impl EmailMessage {
 
         if let Some(in_reply_to) = &self.in_reply_to {
             builder = builder.in_reply_to(in_reply_to.clone());
+        }
+
+        // Add custom headers
+        for (name, value) in &self.additional_headers {
+            builder = builder.header(name.clone(), Raw::new(value.clone()));
         }
 
         // Handle different body types

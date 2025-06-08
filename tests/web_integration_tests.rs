@@ -11,6 +11,8 @@ async fn spawn_test_server() -> (SocketAddr, AppState) {
     };
 
     let state = AppState {
+        mail_sender: None,
+        user_config: whynot::config::UserConfig::default(),
         client: std::sync::Arc::from(client),
         config,
     };
@@ -98,6 +100,8 @@ async fn test_inbox_displays_messages() {
     };
 
     let state = AppState {
+        mail_sender: None,
+        user_config: whynot::config::UserConfig::default(),
         client: std::sync::Arc::from(test_notmuch.client()),
         config,
     };
@@ -362,6 +366,8 @@ async fn test_thread_view_displays_message_content() {
     };
 
     let state = AppState {
+        mail_sender: None,
+        user_config: whynot::config::UserConfig::default(),
         client: std::sync::Arc::from(test_notmuch.client()),
         config,
     };

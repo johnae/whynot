@@ -1203,7 +1203,19 @@ async fn reply_get_handler(
                 let reply_all = params.all.unwrap_or(false);
                 
                 // Determine recipients
-                let to = original_message.headers.from.clone();
+                // If replying to own message, use original recipients instead of sender
+                let to = if let Some(user_email) = &state.user_config.email {
+                    if original_message.headers.from.contains(user_email) {
+                        // Replying to own message - use original recipients
+                        original_message.headers.to.clone()
+                    } else {
+                        // Normal reply - use original sender
+                        original_message.headers.from.clone()
+                    }
+                } else {
+                    // No user email configured, use original sender
+                    original_message.headers.from.clone()
+                };
                 let mut cc = String::new();
                 
                 if reply_all {
@@ -1247,9 +1259,20 @@ async fn reply_get_handler(
                 );
                 
                 // Extract message ID for In-Reply-To
+                // Try multiple sources for the Message-ID
                 let in_reply_to = original_message.headers.additional.get("message-id")
+                    .or_else(|| original_message.headers.additional.get("Message-Id"))
+                    .or_else(|| original_message.headers.additional.get("Message-ID"))
                     .cloned()
-                    .unwrap_or_else(|| format!("<{}@unknown>", original_message.id));
+                    .unwrap_or_else(|| {
+                        // If no Message-ID found in headers, use the notmuch message ID
+                        // But format it as a proper Message-ID
+                        if original_message.id.contains('@') {
+                            format!("<{}>", original_message.id)
+                        } else {
+                            format!("<{}@{}>", original_message.id, "notmuch.local")
+                        }
+                    });
                 
                 // Build references chain
                 let mut references = Vec::new();

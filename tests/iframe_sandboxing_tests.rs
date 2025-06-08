@@ -14,6 +14,8 @@ async fn spawn_test_server_with_notmuch(test_notmuch: TestNotmuch) -> (SocketAdd
     };
 
     let state = AppState {
+        mail_sender: None,
+        user_config: whynot::config::UserConfig::default(),
         client: std::sync::Arc::from(test_notmuch.client()),
         config,
     };
