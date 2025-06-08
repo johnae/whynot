@@ -322,6 +322,7 @@ mod tests {
                 to: "recipient@example.com".to_string(),
                 reply_to: None,
                 date: "Mon, 1 Jan 2024 12:00:00 +0000".to_string(),
+                additional: std::collections::HashMap::new(),
             },
         };
 
@@ -360,6 +361,7 @@ mod tests {
                 to: "recipient@example.com".to_string(),
                 reply_to: None,
                 date: "Mon, 1 Jan 2024 12:00:00 +0000".to_string(),
+                additional: std::collections::HashMap::new(),
             },
         };
 
@@ -387,6 +389,7 @@ mod tests {
                 to: "recipient@example.com".to_string(),
                 reply_to: None,
                 date: "Mon, 1 Jan 2024 12:00:00 +0000".to_string(),
+                additional: std::collections::HashMap::new(),
             },
         };
 
@@ -407,6 +410,7 @@ mod tests {
                 to: "recipient@example.com".to_string(),
                 reply_to: None,
                 date: "Mon, 1 Jan 2024 12:00:00 +0000".to_string(),
+                additional: std::collections::HashMap::new(),
             },
         };
 
@@ -427,6 +431,7 @@ mod tests {
                 to: "recipient@example.com".to_string(),
                 reply_to: None,
                 date: "Mon, 1 Jan 2024 12:00:00 +0000".to_string(),
+                additional: std::collections::HashMap::new(),
             },
         };
 

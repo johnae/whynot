@@ -22,6 +22,25 @@ When a piece of functionality is repeated again and again, it could be some id e
 
 When a new tool or library dependency is needed (not a rust one but something else), please add that dependency to the devenv.nix file.
 
+## Configuration Management
+
+Whynot Mail uses a unified configuration system with the following precedence:
+1. CLI arguments (highest priority)
+2. Environment variables (`WHYNOT_*` prefix)
+3. Configuration file (`~/.config/whynot/config.toml`)
+4. Built-in defaults (lowest priority)
+
+**Configuration Development Requirements:**
+
+- **Always update `config.example.toml`** when adding new configuration options
+- Add corresponding CLI arguments with `--option-name` format
+- Add environment variable support with `WHYNOT_OPTION_NAME` format
+- Update the `CliArgs` struct in `src/config.rs` with proper help text
+- Update configuration structs and merging logic as needed
+- Test all three configuration methods (CLI, env vars, config file) work correctly
+
+The example configuration file serves as both documentation and a template for users. It must be kept in sync with all available options.
+
 ## Code Quality
 
 Please follow clippy hints and suggestions. Run `devenv shell cargo clippy` regularly and address the warnings and suggestions it provides. Clippy helps ensure idiomatic Rust code and catches common mistakes.

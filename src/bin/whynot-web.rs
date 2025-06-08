@@ -1,43 +1,7 @@
 use clap::Parser;
-use std::net::SocketAddr;
-use whynot::client::{ClientConfig, create_client};
+use whynot::client::create_client;
+use whynot::config::{Config, CliArgs};
 use whynot::web::{AppState, WebConfig, create_app};
-
-#[derive(Parser, Debug)]
-#[command(name = "whynot-web")]
-#[command(about = "Web interface for notmuch email", long_about = None)]
-#[command(
-    after_help = "ENVIRONMENT VARIABLES:\n  NOTMUCH_HOST    Remote notmuch server hostname (alternative to --remote)\n  NOTMUCH_USER    Remote notmuch server username (alternative to --user)\n  NOTMUCH_PORT    Remote notmuch server SSH port (alternative to --port)"
-)]
-struct Args {
-    /// Bind address for the web server
-    #[arg(short, long, default_value = "127.0.0.1:8080")]
-    bind: SocketAddr,
-
-    /// Base URL for the application
-    #[arg(long, default_value = "http://localhost:8080")]
-    base_url: String,
-
-    /// Number of items per page
-    #[arg(long, default_value = "50")]
-    items_per_page: usize,
-
-    /// Remote server hostname (if not provided, uses local notmuch)
-    #[arg(long)]
-    remote: Option<String>,
-
-    /// Remote server username
-    #[arg(long)]
-    user: Option<String>,
-
-    /// Remote server SSH port
-    #[arg(long, default_value = "22")]
-    port: u16,
-
-    /// Path to notmuch database (for local mode)
-    #[arg(long)]
-    database: Option<String>,
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -49,44 +13,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .init();
 
-    let args = Args::parse();
+    // Parse CLI arguments and load configuration
+    let cli_args = CliArgs::parse();
+    let config = Config::load(cli_args)?;
 
-    // Check for environment variables if command line args not provided
-    let remote_host = args.remote.or_else(|| std::env::var("NOTMUCH_HOST").ok());
-    let remote_user = args.user.or_else(|| std::env::var("NOTMUCH_USER").ok());
-    let remote_port = if args.port != 22 {
-        Some(args.port)
-    } else {
-        std::env::var("NOTMUCH_PORT")
-            .ok()
-            .and_then(|p| p.parse::<u16>().ok())
-            .or(Some(22))
-    };
-
-    // Create client configuration
-    let client_config = if let Some(hostname) = remote_host.clone() {
+    // Create client configuration from unified config
+    let client_config = config.to_client_config()?;
+    
+    // Log configuration mode
+    let is_remote = config.mail.reading.connection_type.as_deref() == Some("remote") 
+        || config.mail.reading.host.is_some();
+    
+    if is_remote {
         tracing::info!(
             "Using remote notmuch at {}@{}:{}",
-            remote_user.as_deref().unwrap_or("(default)"),
-            hostname,
-            remote_port.unwrap_or(22)
+            config.mail.reading.user.as_deref().unwrap_or("(default)"),
+            config.mail.reading.host.as_deref().unwrap_or("(unknown)"),
+            config.mail.reading.port.unwrap_or(22)
         );
-
-        ClientConfig::Remote {
-            host: hostname,
-            user: remote_user.clone(),
-            port: remote_port,
-            identity_file: None,
-            notmuch_path: None,
-        }
     } else {
         tracing::info!("Using local notmuch");
-        ClientConfig::Local {
-            notmuch_path: None,
-            database_path: args.database.clone().map(Into::into),
-            mail_root: None,
-        }
-    };
+    }
 
     // Create the notmuch client
     let client = create_client(client_config)?;
@@ -110,49 +57,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Create web configuration
-    let config = WebConfig {
-        bind_address: args.bind,
-        base_url: args.base_url,
-        items_per_page: args.items_per_page,
+    // Create web configuration from unified config
+    let web_config = WebConfig {
+        bind_address: config.bind_address()?,
+        base_url: config.base_url(),
+        items_per_page: config.items_per_page(),
     };
 
     let state = AppState {
         client: std::sync::Arc::from(client),
-        config: config.clone(),
+        config: web_config.clone(),
     };
 
     // Create the application
     let app = create_app(state);
 
     // Create the TCP listener
-    let listener = tokio::net::TcpListener::bind(config.bind_address).await?;
+    let listener = tokio::net::TcpListener::bind(web_config.bind_address).await?;
     let local_addr = listener.local_addr()?;
 
     println!("Whynot Web Server");
     println!("=================");
     println!("Listening on: http://{}", local_addr);
-    println!("Base URL: {}", config.base_url);
-    println!("Items per page: {}", config.items_per_page);
+    println!("Base URL: {}", web_config.base_url);
+    println!("Items per page: {}", web_config.items_per_page);
 
-    // Display client mode
-    if let Some(hostname) = &remote_host {
-        println!("Notmuch mode: Remote");
-        println!("Remote host: {}", hostname);
-        if let Some(user) = &remote_user {
-            println!("Remote user: {}", user);
-        }
-        if let Some(port) = remote_port {
-            if port != 22 {
-                println!("Remote port: {}", port);
-            }
-        }
-    } else {
-        println!("Notmuch mode: Local");
-        if let Some(db) = &args.database {
-            println!("Database path: {}", db);
-        }
-    }
+    // Display client configuration info
+    display_client_info(&config);
 
     println!();
     println!("Press Ctrl+C to stop");
@@ -161,4 +92,73 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+
+fn display_client_info(config: &Config) {
+    let is_remote = config.mail.reading.connection_type.as_deref() == Some("remote") 
+        || config.mail.reading.host.is_some();
+
+    if is_remote {
+        println!("Notmuch mode: Remote");
+        if let Some(host) = &config.mail.reading.host {
+            println!("Remote host: {}", host);
+        }
+        if let Some(user) = &config.mail.reading.user {
+            println!("Remote user: {}", user);
+        }
+        if let Some(port) = config.mail.reading.port {
+            if port != 22 {
+                println!("Remote port: {}", port);
+            }
+        }
+        if let Some(path) = &config.mail.reading.notmuch_path {
+            println!("Remote notmuch path: {}", path);
+        }
+    } else {
+        println!("Notmuch mode: Local");
+        if let Some(db) = &config.mail.reading.database_path {
+            println!("Database path: {}", db);
+        }
+        if let Some(path) = &config.mail.reading.notmuch_path {
+            println!("Notmuch path: {}", path);
+        }
+    }
+
+    // Display user configuration if available
+    if let Some(name) = &config.user.name {
+        println!("User name: {}", name);
+    }
+    if let Some(email) = &config.user.email {
+        println!("User email: {}", email);
+    }
+
+    // Display mail sending configuration if configured
+    let sending_configured = config.mail.sending.connection_type.is_some() 
+        || config.mail.sending.host.is_some() 
+        || config.mail.sending.msmtp_path.is_some();
+    
+    if sending_configured {
+        let is_sending_remote = config.mail.sending.connection_type.as_deref() == Some("remote") 
+            || config.mail.sending.host.is_some();
+        
+        if is_sending_remote {
+            println!("Mail sending: Remote (via SSH)");
+            if let Some(host) = &config.mail.sending.host {
+                println!("MSMTP host: {}", host);
+            }
+            if let Some(user) = &config.mail.sending.user {
+                println!("MSMTP user: {}", user);
+            }
+        } else {
+            println!("Mail sending: Local");
+        }
+        
+        if let Some(path) = &config.mail.sending.msmtp_path {
+            println!("MSMTP path: {}", path);
+        }
+        if let Some(config_path) = &config.mail.sending.config_path {
+            println!("MSMTP config: {}", config_path);
+        }
+    }
 }

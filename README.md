@@ -58,12 +58,28 @@ Then open http://localhost:8080 (the default port) in your browser.
 If you're using remote notmuch (which is pretty cool), you'll want SSH key-based authentication set up. I use [Tailscale](https://tailscale.com) with ACLs to securely expose notmuch over my private network, which is a nice way to access my email from anywhere without exposing SSH to the entire internet.
 
 ```bash
-# Environment variables work too
+# Environment variables work too (legacy format)
 export NOTMUCH_HOST="mail.example.com"
 export NOTMUCH_USER="yourusername"
 export NOTMUCH_PORT="2222"
 cargo run --bin whynot-web
+
+# Or use the new WHYNOT_ prefix
+export WHYNOT_NOTMUCH_HOST="mail.example.com"
+export WHYNOT_NOTMUCH_USER="yourusername"
+cargo run --bin whynot-web
 ```
+
+### Configuration
+
+Whynot supports multiple configuration methods with the following precedence:
+
+1. **CLI arguments** (highest priority): `--notmuch-host mail.example.com`
+2. **Environment variables**: `WHYNOT_NOTMUCH_HOST=mail.example.com` 
+3. **Configuration file**: `~/.config/whynot/config.toml`
+4. **Built-in defaults** (lowest priority)
+
+See `config.example.toml` for a comprehensive example with all available options including mail sending, user identity, and UI customization.
 
 ## What's Missing
 

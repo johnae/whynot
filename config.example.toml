@@ -1,0 +1,167 @@
+# Whynot Mail - Example Configuration File
+# 
+# This file shows all available configuration options with example values.
+# Copy this file to ~/.config/whynot/config.toml and customize as needed.
+#
+# Configuration precedence (highest to lowest):
+# 1. CLI arguments (--flag value)
+# 2. Environment variables (WHYNOT_*)  
+# 3. This configuration file
+# 4. Built-in defaults
+
+# User identity settings
+[user]
+# Your full name for email composition
+name = "John Doe"
+
+# Your primary email address
+email = "john@example.com"
+
+# Email signature (use \n for line breaks)
+signature = "Best regards,\nJohn Doe\nSoftware Engineer"
+
+# Mail reading configuration (notmuch)
+[mail.reading]
+# Connection type: "local" or "remote"
+type = "remote"
+
+# Remote server hostname (required for remote type)
+host = "mail.example.com"
+
+# SSH username for remote connection
+user = "john"
+
+# SSH port (default: 22)
+port = 2222
+
+# Path to notmuch executable (optional, uses system PATH if not specified)
+notmuch_path = "/usr/bin/notmuch"
+
+# Path to notmuch database (for local type only)
+database_path = "/home/john/mail"
+
+# Mail sending configuration (msmtp)
+[mail.sending]
+# Connection type: "local" or "remote"
+type = "remote"
+
+# Remote server hostname (required for remote type)
+host = "mail.example.com"
+
+# SSH username for remote connection
+user = "john"
+
+# SSH port (default: 22)
+port = 2222
+
+# Path to msmtp executable (optional, uses system PATH if not specified)
+msmtp_path = "/usr/bin/msmtp"
+
+# Path to msmtp configuration file
+config_path = "/home/john/.msmtprc"
+
+# Web interface configuration
+[ui.web]
+# Server bind address and port
+bind = "127.0.0.1:8080"
+
+# Base URL for the application (used for links and redirects)
+base_url = "http://localhost:8080"
+
+# Number of items to display per page in search results and inbox
+items_per_page = 50
+
+# Default theme: "light" or "dark"
+default_theme = "light"
+
+# Terminal UI configuration (future feature)
+[ui.tui]
+# Keybinding style: "vim", "emacs", or "default"
+keybindings = "vim"
+
+# Show sidebar with folders/tags
+show_sidebar = true
+
+# General application behavior
+[general]
+# Auto-refresh interval in seconds (0 to disable)
+auto_refresh_interval = 300
+
+# Enable email threading
+threading_enabled = true
+
+# Example configurations for different use cases:
+
+# LOCAL SETUP EXAMPLE:
+# Uncomment and modify for local-only setup
+#
+# [mail.reading]
+# type = "local"
+# database_path = "/home/username/mail"
+# notmuch_path = "/usr/local/bin/notmuch"
+#
+# [mail.sending]
+# type = "local"
+# msmtp_path = "/usr/local/bin/msmtp"
+# config_path = "/home/username/.msmtprc"
+
+# REMOTE-ONLY SETUP EXAMPLE:
+# Uncomment and modify for SSH-based remote access
+#
+# [mail.reading]
+# type = "remote"
+# host = "mailserver.domain.com"
+# user = "username"
+# port = 22
+# notmuch_path = "/usr/bin/notmuch"
+#
+# [mail.sending]
+# type = "remote"
+# host = "mailserver.domain.com"
+# user = "username"
+# port = 22
+# msmtp_path = "/usr/bin/msmtp"
+# config_path = "/home/username/.msmtprc"
+
+# HYBRID SETUP EXAMPLE:
+# Local reading, remote sending (or vice versa)
+#
+# [mail.reading]
+# type = "local"
+# database_path = "/home/username/mail"
+#
+# [mail.sending]
+# type = "remote"
+# host = "smtp-server.domain.com"
+# user = "username"
+
+# WEB SERVER CUSTOMIZATION:
+# Different port and public access
+#
+# [ui.web]
+# bind = "0.0.0.0:3000"
+# base_url = "https://mail.mydomain.com"
+# items_per_page = 25
+# default_theme = "dark"
+
+# ADVANCED USER SETUP:
+# Custom paths and detailed identity
+#
+# [user]
+# name = "Jane Smith"
+# email = "jane.smith@company.com"
+# signature = "Jane Smith\nSenior Developer\nCompany Name\nPhone: +1-555-0123"
+#
+# [mail.reading]
+# type = "local"
+# notmuch_path = "/opt/notmuch/bin/notmuch"
+# database_path = "/var/mail/jane"
+#
+# [mail.sending]
+# type = "local"
+# msmtp_path = "/opt/msmtp/bin/msmtp"
+# config_path = "/etc/msmtp/company.conf"
+#
+# [general]
+# auto_refresh_interval = 120
+# threading_enabled = true

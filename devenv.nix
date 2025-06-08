@@ -11,6 +11,7 @@
   # https://devenv.sh/packages/
   packages = [
     pkgs.git
+    pkgs.msmtp
     pkgs.notmuch
     pkgs.openssl
     pkgs.pkg-config

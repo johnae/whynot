@@ -19,6 +19,13 @@ pub enum NotmuchError {
 
     #[error("Invalid configuration: {0}")]
     ConfigError(String),
+
+    #[error("Mail sending failed: {0}")]
+    MailSendError(String),
+
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 pub type Result<T> = std::result::Result<T, NotmuchError>;
+pub use NotmuchError as Error;
