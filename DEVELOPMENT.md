@@ -12,6 +12,42 @@ For current work and todos, please see ./TODO.md
 
 ## Development Workflow
 
+### Version Control with Jujutsu (jj)
+
+This project uses [Jujutsu (jj)](https://github.com/martinvonz/jj) instead of git for version control. Jj is fully interoperable with git but provides a more intuitive workflow for development.
+
+**Starting a new feature:**
+```bash
+# Create a new change for your feature
+jj new
+
+# Describe what you're implementing before starting work
+jj describe -m 'feat(search): add advanced filtering options'
+# or for bug fixes:
+jj describe -m 'fix(web): resolve CSS layout issue in thread view'
+```
+
+**Commit conventions:**
+- Use conventional commit format: `feat(scope): description` or `fix(scope): description`
+- Commit frequently, especially after tests pass
+- Each logical change should be a separate commit
+
+**Completing a feature:**
+```bash
+# When done with current feature, start a new change
+jj new
+
+# With jj, your changes are automatically tracked (i.e "committed") whenever you run any jj command basically.
+# You tend to start a change and then evolve it through whatever changes you make. When you're happy, you can
+# start a new change via "jj new". If you want to, you may edit an existing change through "jj edit <rev>"
+```
+
+**Key differences from git:**
+- No explicit commit step - changes are automatically tracked
+- `jj new` both commits current work and starts a new change
+- Each change has a unique ID and can be easily amended
+- Working copy is always on a change, never detached
+
 ### Test-Driven Development
 
 This project follows a test-driven workflow. For changes where it makes sense, start by creating a test. Do not create any mocks but rather, create a test and run it expecting it to fail. After the tests are in place, go ahead and implement the actual feature, fix or change. Do not change the test(s) to make it pass, unless the test is obviously wrong.

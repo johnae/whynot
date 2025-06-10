@@ -12,6 +12,7 @@ config.toml
 
 CLAUDE.md
 TODO.md
+ARCHITECTURE.md
 .claude/*
 
 # Added by cargo
