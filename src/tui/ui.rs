@@ -83,7 +83,7 @@ fn draw_email_view(f: &mut Frame, app: &mut App, area: Rect) {
         draw_email_headers(f, message, chunks[0]);
         
         // Email body
-        draw_email_body(f, message, chunks[1]);
+        draw_email_body(f, app, chunks[1]);
     } else {
         let paragraph = Paragraph::new("No email selected")
             .block(Block::default().borders(Borders::ALL).title("Email View"));
@@ -125,26 +125,11 @@ fn draw_email_headers(f: &mut Frame, message: &Message, area: Rect) {
     f.render_widget(headers, area);
 }
 
-fn draw_email_body(f: &mut Frame, message: &Message, area: Rect) {
-    // For now, we'll display the first text part or a placeholder
-    let body_text = if !message.body.is_empty() {
-        if let Some(text_part) = message.body.iter().find(|part| part.content_type.starts_with("text/plain")) {
-            match &text_part.content {
-                crate::body::BodyContent::Text(text) => text.clone(),
-                _ => "[No text content]".to_string(),
-            }
-        } else if let Some(html_part) = message.body.iter().find(|part| part.content_type.starts_with("text/html")) {
-            // TODO: Convert HTML to text using our existing converter
-            match &html_part.content {
-                crate::body::BodyContent::Text(html) => format!("[HTML content - {} chars]", html.len()),
-                _ => "[No HTML content]".to_string(),
-            }
-        } else {
-            "[No readable content]".to_string()
-        }
-    } else {
-        "[No body content]".to_string()
-    };
+fn draw_email_body(f: &mut Frame, app: &App, area: Rect) {
+    // Use the processed email body text if available
+    let body_text = app.current_email_body.as_ref()
+        .map(|text| text.clone())
+        .unwrap_or_else(|| "[No body content]".to_string());
 
     let paragraph = Paragraph::new(body_text)
         .block(Block::default().borders(Borders::ALL).title("Content"))
