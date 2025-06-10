@@ -13,6 +13,7 @@ async fn spawn_test_server() -> (SocketAddr, AppState) {
         bind_address: ([127, 0, 0, 1], 0).into(),
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
+        auto_refresh_interval: 30,
     };
 
     let state = AppState {
@@ -122,6 +123,7 @@ async fn test_thread_view_shows_image_toggle_ui() {
         bind_address: ([127, 0, 0, 1], 0).into(),
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
+        auto_refresh_interval: 30,
     };
 
     let state = AppState {
@@ -204,6 +206,7 @@ async fn test_email_frame_respects_show_images_parameter() {
         bind_address: ([127, 0, 0, 1], 0).into(),
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
+        auto_refresh_interval: 30,
     };
 
     let state = AppState {

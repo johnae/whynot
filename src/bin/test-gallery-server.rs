@@ -89,6 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         bind_address: "127.0.0.1:8080".parse().unwrap(),
         base_url: "http://localhost:8080".to_string(),
         items_per_page: 50,
+        auto_refresh_interval: 30,
     };
 
     let state = AppState {

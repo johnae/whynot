@@ -90,6 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         bind_address: config.bind_address()?,
         base_url: config.base_url(),
         items_per_page: config.items_per_page(),
+        auto_refresh_interval: config.general.auto_refresh_interval.unwrap_or(30),
     };
 
     let state = AppState {

@@ -12,6 +12,7 @@ use axum::{
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::services::ServeDir;
@@ -32,6 +33,7 @@ pub struct WebConfig {
     pub bind_address: SocketAddr,
     pub base_url: String,
     pub items_per_page: usize,
+    pub auto_refresh_interval: u64,
 }
 
 #[derive(Template)]
@@ -41,6 +43,7 @@ struct InboxTemplate {
     theme: String,
     active_tags: Vec<String>,
     search_query: Option<String>,
+    auto_refresh_interval: u64,
 }
 
 pub fn create_app(state: AppState) -> Router {
@@ -63,6 +66,7 @@ pub fn create_app(state: AppState) -> Router {
         .route("/settings", get(settings_handler))
         .route("/settings/theme", post(toggle_theme_handler))
         .route("/api/log-redirect", post(log_redirect_handler))
+        .route("/api/refresh-query", get(refresh_query_handler))
         .route("/test/email-gallery", get(test_email_gallery_handler))
         .route(
             "/test/email-gallery/:email_name",
@@ -113,6 +117,7 @@ async fn inbox_handler(State(state): State<AppState>, headers: HeaderMap) -> imp
         theme,
         active_tags: vec![],
         search_query: None,
+        auto_refresh_interval: state.config.auto_refresh_interval,
     }
 }
 
@@ -234,6 +239,7 @@ async fn search_handler(
         theme,
         active_tags,
         search_query,
+        auto_refresh_interval: state.config.auto_refresh_interval,
     }
 }
 
@@ -796,6 +802,43 @@ async fn log_redirect_handler(Json(log_entry): Json<RedirectLogEntry>) -> impl I
     // 4. Send alerts for high-risk domains
 
     (StatusCode::OK, "Logged").into_response()
+}
+
+#[derive(Deserialize)]
+struct RefreshQueryParams {
+    q: Option<String>,
+}
+
+#[derive(Serialize)]
+struct RefreshQueryResponse {
+    messages: Vec<SearchItem>,
+    timestamp: DateTime<Utc>,
+}
+
+async fn refresh_query_handler(
+    State(state): State<AppState>,
+    Query(params): Query<RefreshQueryParams>,
+) -> impl IntoResponse {
+    // Use provided query or default to inbox
+    let query = params.q.unwrap_or_else(|| "tag:inbox".to_string());
+    
+    let messages = match state.client.search(&query).await {
+        Ok(results) => {
+            tracing::info!("Refresh query '{}' returned {} results", query, results.len());
+            results
+        }
+        Err(e) => {
+            tracing::error!("Failed to refresh query '{}': {}", query, e);
+            vec![]
+        }
+    };
+
+    let response = RefreshQueryResponse {
+        messages,
+        timestamp: Utc::now(),
+    };
+
+    Json(response)
 }
 
 /// Generate a placeholder image for blocked external images

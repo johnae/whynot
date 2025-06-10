@@ -250,5 +250,98 @@ document.addEventListener('click', function(event) {
         dropdown.style.display = 'none';
     }
 });
+
+// Auto-refresh functionality
+let autoRefreshInterval = null;
+
+async function refreshQuery() {
+    try {
+        // Get current query from URL or default to inbox
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentQuery = urlParams.get('q') || 'tag:inbox';
+        
+        console.log('Auto-refreshing query:', currentQuery);
+        
+        const response = await fetch(`/api/refresh-query?q=${encodeURIComponent(currentQuery)}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Refresh returned', data.messages.length, 'messages');
+        
+        // Update the message list without full page reload
+        updateMessageList(data.messages);
+        
+    } catch (error) {
+        console.error('Auto-refresh failed:', error);
+    }
+}
+
+function updateMessageList(messages) {
+    const messageList = document.querySelector('.message-list');
+    if (!messageList) return;
+    
+    // Simple approach: replace entire message list
+    // TODO: Could be optimized to only update changed messages
+    let html = '';
+    
+    if (messages.length === 0) {
+        html = '<div class="empty-state"><p>No messages found.</p></div>';
+    } else {
+        messages.forEach(message => {
+            html += `
+                <div class="message-item">
+                    <div class="message-header">
+                        <span class="sender">${escapeHtml(message.authors)}</span>
+                        <span class="date">${escapeHtml(message.date_relative)}</span>
+                    </div>
+                    <div class="subject">
+                        <a href="/thread/${escapeHtml(message.thread)}">${escapeHtml(message.subject)}</a>
+                    </div>
+                    <div class="tags">
+                        ${message.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    messageList.innerHTML = html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function startAutoRefresh() {
+    // Use configured refresh interval (convert seconds to milliseconds)
+    const intervalMs = {{ auto_refresh_interval }} * 1000;
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+    autoRefreshInterval = setInterval(refreshQuery, intervalMs);
+    console.log('Auto-refresh started (' + {{ auto_refresh_interval }} + 's interval)');
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+        console.log('Auto-refresh stopped');
+    }
+}
+
+// Start auto-refresh when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    startAutoRefresh();
+});
+
+// Stop auto-refresh when page unloads
+window.addEventListener('beforeunload', function() {
+    stopAutoRefresh();
+});
 </script>
 {% endblock %}
