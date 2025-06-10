@@ -18,7 +18,7 @@ This project uses [Jujutsu (jj)](https://github.com/martinvonz/jj) instead of gi
 
 **Starting a new feature:**
 ```bash
-# Create a new change for your feature
+# Create a new change for your feature - please always do this as you start new work. You can combine it with -m to avoid the describe step.
 jj new
 
 # Describe what you're implementing before starting work

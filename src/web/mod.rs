@@ -34,16 +34,24 @@ pub struct WebConfig {
     pub base_url: String,
     pub items_per_page: usize,
     pub auto_refresh_interval: u64,
+    pub initial_page_size: usize,
+    pub pagination_size: usize,
+    pub infinite_scroll_enabled: bool,
 }
 
 #[derive(Template)]
 #[template(path = "inbox.html")]
 struct InboxTemplate {
     messages: Vec<SearchItem>,
+    messages_count: usize,
     theme: String,
     active_tags: Vec<String>,
     search_query: Option<String>,
     auto_refresh_interval: u64,
+    initial_page_size: usize,
+    pagination_size: usize,
+    infinite_scroll_enabled: bool,
+    has_more_messages: bool,
 }
 
 pub fn create_app(state: AppState) -> Router {
@@ -67,6 +75,7 @@ pub fn create_app(state: AppState) -> Router {
         .route("/settings/theme", post(toggle_theme_handler))
         .route("/api/log-redirect", post(log_redirect_handler))
         .route("/api/refresh-query", get(refresh_query_handler))
+        .route("/api/load-more", get(load_more_handler))
         .route("/test/email-gallery", get(test_email_gallery_handler))
         .route(
             "/test/email-gallery/:email_name",
@@ -98,26 +107,40 @@ fn get_theme_from_headers(headers: &HeaderMap) -> String {
 }
 
 async fn inbox_handler(State(state): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
-    // Search for messages tagged with "inbox"
-    let messages = match state.client.search("tag:inbox").await {
-        Ok(results) => {
-            tracing::info!("Found {} messages in inbox", results.len());
-            results
+    // Search for messages tagged with "inbox" with pagination
+    let (messages, total_count) = match state.client.search_paginated("tag:inbox", 0, state.config.initial_page_size).await {
+        Ok((results, total_count)) => {
+            tracing::info!("Found {} messages in inbox (initial page), total: {:?}", results.len(), total_count);
+            (results, total_count)
         }
         Err(e) => {
             tracing::error!("Failed to search inbox: {}", e);
-            vec![]
+            (vec![], None)
         }
     };
 
     let theme = get_theme_from_headers(&headers);
+    let messages_count = messages.len();
+    
+    // Calculate if there are more messages available
+    let has_more_messages = if let Some(total) = total_count {
+        messages_count < total
+    } else {
+        // If we don't have total count, assume there are more if we got exactly the requested amount
+        messages_count >= state.config.initial_page_size
+    };
 
     InboxTemplate {
         messages,
+        messages_count,
         theme,
         active_tags: vec![],
         search_query: None,
         auto_refresh_interval: state.config.auto_refresh_interval,
+        initial_page_size: state.config.initial_page_size,
+        pagination_size: state.config.pagination_size,
+        infinite_scroll_enabled: state.config.infinite_scroll_enabled,
+        has_more_messages,
     }
 }
 
@@ -193,22 +216,32 @@ async fn search_handler(
         query_parts.join(" AND ")
     };
 
-    let messages = match state.client.search(&query).await {
-        Ok(results) => {
+    let (messages, total_count) = match state.client.search_paginated(&query, 0, state.config.initial_page_size).await {
+        Ok((results, total_count)) => {
             tracing::info!(
-                "Search query '{}' returned {} results",
+                "Search query '{}' returned {} results (initial page), total: {:?}",
                 query,
-                results.len()
+                results.len(),
+                total_count
             );
-            results
+            (results, total_count)
         }
         Err(e) => {
             tracing::error!("Failed to search: {}", e);
-            vec![]
+            (vec![], None)
         }
     };
 
     let theme = get_theme_from_headers(&headers);
+    let messages_count = messages.len();
+    
+    // Calculate if there are more messages available
+    let has_more_messages = if let Some(total) = total_count {
+        messages_count < total
+    } else {
+        // If we don't have total count, assume there are more if we got exactly the requested amount
+        messages_count >= state.config.initial_page_size
+    };
 
     // Extract active tags from query
     let mut active_tags = vec![];
@@ -236,10 +269,15 @@ async fn search_handler(
 
     InboxTemplate {
         messages,
+        messages_count,
         theme,
         active_tags,
         search_query,
         auto_refresh_interval: state.config.auto_refresh_interval,
+        initial_page_size: state.config.initial_page_size,
+        pagination_size: state.config.pagination_size,
+        infinite_scroll_enabled: state.config.infinite_scroll_enabled,
+        has_more_messages,
     }
 }
 
@@ -822,9 +860,13 @@ async fn refresh_query_handler(
     // Use provided query or default to inbox
     let query = params.q.unwrap_or_else(|| "tag:inbox".to_string());
     
-    let messages = match state.client.search(&query).await {
-        Ok(results) => {
-            tracing::info!("Refresh query '{}' returned {} results", query, results.len());
+    // Use paginated search to avoid large response payloads that cause network timeouts
+    // Limit to the initial page size to match what the user initially sees
+    let limit = state.config.initial_page_size;
+    
+    let messages = match state.client.search_paginated(&query, 0, limit).await {
+        Ok((results, _total_count)) => {
+            tracing::info!("Refresh query '{}' returned {} results (limited to {})", query, results.len(), limit);
             results
         }
         Err(e) => {
@@ -839,6 +881,73 @@ async fn refresh_query_handler(
     };
 
     Json(response)
+}
+
+#[derive(Deserialize)]
+struct LoadMoreParams {
+    q: Option<String>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+}
+
+#[derive(Serialize)]
+struct LoadMoreResponse {
+    messages: Vec<SearchItem>,
+    has_more: bool,
+    total_count: Option<usize>,
+    offset: usize,
+    limit: usize,
+}
+
+async fn load_more_handler(
+    State(state): State<AppState>,
+    Query(params): Query<LoadMoreParams>,
+) -> impl IntoResponse {
+    // Use provided query or default to inbox
+    let query = params.q.unwrap_or_else(|| "tag:inbox".to_string());
+    let offset = params.offset.unwrap_or(0);
+    let limit = params.limit.unwrap_or(state.config.pagination_size);
+    
+    tracing::info!("load_more_handler: query='{}', offset={}, limit={}", query, offset, limit);
+    
+    match state.client.search_paginated(&query, offset, limit).await {
+        Ok((messages, total_count)) => {
+            let has_more = if let Some(total) = total_count {
+                offset + messages.len() < total
+            } else {
+                // If we don't have total count, assume there are more if we got exactly `limit` messages
+                messages.len() == limit
+            };
+            
+            tracing::info!(
+                "Load more query '{}' (offset={}, limit={}) returned {} results, has_more={}",
+                query, offset, limit, messages.len(), has_more
+            );
+            
+            let response = LoadMoreResponse {
+                messages,
+                has_more,
+                total_count,
+                offset,
+                limit,
+            };
+            
+            Json(response).into_response()
+        }
+        Err(e) => {
+            tracing::error!("Failed to load more for query '{}': {:?}", query, e);
+            
+            let error_response = LoadMoreResponse {
+                messages: vec![],
+                has_more: false,
+                total_count: None,
+                offset,
+                limit,
+            };
+            
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)).into_response()
+        }
+    }
 }
 
 /// Generate a placeholder image for blocked external images

@@ -15,6 +15,10 @@ path = "src/bin/whynot-web.rs"
 name = "test-gallery-server"
 path = "src/bin/test-gallery-server.rs"
 
+[[bin]]
+name = "debug-infinite-scroll"
+path = "src/bin/debug_infinite_scroll.rs"
+
 
 [features]
 test-utils = []

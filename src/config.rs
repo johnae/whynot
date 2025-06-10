@@ -77,6 +77,9 @@ pub struct WebConfig {
     pub base_url: Option<String>,
     pub items_per_page: Option<usize>,
     pub default_theme: Option<String>,
+    pub initial_page_size: Option<usize>,
+    pub pagination_size: Option<usize>,
+    pub infinite_scroll_enabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,6 +120,15 @@ pub struct CliArgs {
 
     #[arg(long, env = "WHYNOT_DEFAULT_THEME", help = "Default theme (light/dark)")]
     pub default_theme: Option<String>,
+
+    #[arg(long, env = "WHYNOT_INITIAL_PAGE_SIZE", help = "Number of messages to load initially")]
+    pub initial_page_size: Option<usize>,
+
+    #[arg(long, env = "WHYNOT_PAGINATION_SIZE", help = "Number of messages to load when scrolling")]
+    pub pagination_size: Option<usize>,
+
+    #[arg(long, env = "WHYNOT_INFINITE_SCROLL_ENABLED", help = "Enable infinite scrolling")]
+    pub infinite_scroll_enabled: Option<bool>,
 
     // Mail reading options
     #[arg(long, env = "WHYNOT_NOTMUCH_HOST", help = "Remote notmuch server hostname")]
@@ -192,6 +204,9 @@ impl Default for WebConfig {
             base_url: Some("http://localhost:8080".to_string()),
             items_per_page: Some(50),
             default_theme: Some("light".to_string()),
+            initial_page_size: Some(20),
+            pagination_size: Some(10),
+            infinite_scroll_enabled: Some(true),
         }
     }
 }
@@ -304,6 +319,21 @@ impl Config {
         if let Ok(theme) = env::var("WHYNOT_DEFAULT_THEME") {
             config.ui.web.default_theme = Some(theme);
         }
+        if let Ok(initial_size) = env::var("WHYNOT_INITIAL_PAGE_SIZE") {
+            config.ui.web.initial_page_size = Some(initial_size.parse().map_err(|e| {
+                NotmuchError::ConfigError(format!("Invalid WHYNOT_INITIAL_PAGE_SIZE: {}", e))
+            })?);
+        }
+        if let Ok(pagination_size) = env::var("WHYNOT_PAGINATION_SIZE") {
+            config.ui.web.pagination_size = Some(pagination_size.parse().map_err(|e| {
+                NotmuchError::ConfigError(format!("Invalid WHYNOT_PAGINATION_SIZE: {}", e))
+            })?);
+        }
+        if let Ok(infinite_scroll) = env::var("WHYNOT_INFINITE_SCROLL_ENABLED") {
+            config.ui.web.infinite_scroll_enabled = Some(infinite_scroll.parse().map_err(|e| {
+                NotmuchError::ConfigError(format!("Invalid WHYNOT_INFINITE_SCROLL_ENABLED: {}", e))
+            })?);
+        }
 
         // Mail reading configuration
         if let Ok(host) = env::var("WHYNOT_NOTMUCH_HOST") {
@@ -404,6 +434,15 @@ impl Config {
         }
         if let Some(theme) = args.default_theme {
             config.ui.web.default_theme = Some(theme);
+        }
+        if let Some(initial_size) = args.initial_page_size {
+            config.ui.web.initial_page_size = Some(initial_size);
+        }
+        if let Some(pagination_size) = args.pagination_size {
+            config.ui.web.pagination_size = Some(pagination_size);
+        }
+        if let Some(infinite_scroll) = args.infinite_scroll_enabled {
+            config.ui.web.infinite_scroll_enabled = Some(infinite_scroll);
         }
 
         // Mail reading configuration
@@ -517,6 +556,15 @@ impl Config {
         }
         if other.ui.web.default_theme.is_some() {
             base.ui.web.default_theme = other.ui.web.default_theme;
+        }
+        if other.ui.web.initial_page_size.is_some() {
+            base.ui.web.initial_page_size = other.ui.web.initial_page_size;
+        }
+        if other.ui.web.pagination_size.is_some() {
+            base.ui.web.pagination_size = other.ui.web.pagination_size;
+        }
+        if other.ui.web.infinite_scroll_enabled.is_some() {
+            base.ui.web.infinite_scroll_enabled = other.ui.web.infinite_scroll_enabled;
         }
 
         // Merge TUI config

@@ -12,6 +12,9 @@ async fn spawn_test_server_with_notmuch(test_notmuch: TestNotmuch) -> (SocketAdd
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
         auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {

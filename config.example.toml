@@ -74,6 +74,16 @@ items_per_page = 50
 # Default theme: "light" or "dark"
 default_theme = "light"
 
+# Pagination settings for email lists
+# Number of emails to load initially
+initial_page_size = 20
+
+# Number of emails to load when scrolling down
+pagination_size = 10
+
+# Enable infinite scrolling (false for traditional pagination)
+infinite_scroll_enabled = true
+
 # Terminal UI configuration (future feature)
 [ui.tui]
 # Keybinding style: "vim", "emacs", or "default"

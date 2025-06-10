@@ -91,6 +91,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         base_url: config.base_url(),
         items_per_page: config.items_per_page(),
         auto_refresh_interval: config.general.auto_refresh_interval.unwrap_or(30),
+        initial_page_size: config.ui.web.initial_page_size.unwrap_or(20),
+        pagination_size: config.ui.web.pagination_size.unwrap_or(10),
+        infinite_scroll_enabled: config.ui.web.infinite_scroll_enabled.unwrap_or(true),
     };
 
     let state = AppState {

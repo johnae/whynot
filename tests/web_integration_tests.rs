@@ -9,6 +9,9 @@ async fn spawn_test_server() -> (SocketAddr, AppState) {
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
         auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
@@ -99,6 +102,9 @@ async fn test_inbox_displays_messages() {
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
         auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
@@ -366,6 +372,9 @@ async fn test_thread_view_displays_message_content() {
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
         auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {

@@ -14,6 +14,9 @@ async fn spawn_test_server() -> (SocketAddr, AppState) {
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
         auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
@@ -124,6 +127,9 @@ async fn test_thread_view_shows_image_toggle_ui() {
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
         auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
@@ -207,6 +213,9 @@ async fn test_email_frame_respects_show_images_parameter() {
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
         auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {

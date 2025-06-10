@@ -203,6 +203,7 @@ main {
     padding: 16px;
     border-bottom: 1px solid var(--border);
     transition: background-color 0.1s ease;
+    min-height: 100px; /* Make messages taller for easier testing */
 }
 
 .message-item:last-child {
@@ -558,4 +559,40 @@ main {
 /* Hide plain text content when HTML is available */
 .hidden {
     display: none;
+}
+
+/* Infinite scroll loading indicator */
+.loading-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    gap: 12px;
+    min-height: 50px; /* Ensure it has some height to be observable */
+    border: 1px dashed var(--border-color); /* Make it visible for debugging */
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* End of results indicator */
+.end-of-results {
+    text-align: center;
+    padding: 32px;
+    color: var(--text-secondary);
+    font-style: italic;
+    border-top: 1px solid var(--border);
+    margin-top: 16px;
 }

@@ -9,6 +9,9 @@ async fn spawn_test_server() -> (SocketAddr, AppState) {
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
         auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
@@ -139,6 +142,9 @@ async fn test_refresh_query_returns_current_messages() {
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
         auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
@@ -298,6 +304,9 @@ async fn test_refresh_query_preserves_thread_ids() {
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
         auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
@@ -372,6 +381,9 @@ async fn test_auto_refresh_javascript_generates_correct_thread_links() {
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
         auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {

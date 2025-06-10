@@ -52,7 +52,7 @@
     </div>
     {% endif %}
     
-    <div class="message-list">
+    <div class="message-list" id="message-list">
         {% for message in messages %}
         <div class="message-item">
             <div class="message-header">
@@ -75,6 +75,19 @@
             <p>No messages found.</p>
         </div>
         {% endif %}
+        
+        <!-- Loading indicator for infinite scroll -->
+        {% if has_more_messages %}
+        <div id="loading-indicator" class="loading-indicator">
+            <div class="spinner"></div>
+            <span>Loading more messages...</span>
+        </div>
+        {% endif %}
+        
+        <!-- End of results indicator -->
+        <div id="end-of-results" class="end-of-results" style="display: none;">
+            <p>No more messages to load</p>
+        </div>
     </div>
 </div>
 
@@ -268,10 +281,28 @@ async function refreshQuery() {
         }
         
         const data = await response.json();
-        console.log('Refresh returned', data.messages.length, 'messages');
+        console.log('Refresh returned', data.messages.length, 'messages (first page only)');
         
-        // Update the message list without full page reload
-        updateMessageList(data.messages);
+        // Check if there are new messages by comparing with current first message
+        const messageList = document.querySelector('.message-list');
+        const currentFirstMessage = messageList?.querySelector('.message-item a');
+        const newFirstMessage = data.messages[0];
+        
+        if (newFirstMessage && currentFirstMessage) {
+            const currentFirstThreadId = currentFirstMessage.getAttribute('href')?.split('/').pop();
+            const newFirstThreadId = newFirstMessage.thread;
+            
+            // Only update if there are actually new messages
+            if (newFirstThreadId !== currentFirstThreadId) {
+                console.log('New messages detected, prepending to current list');
+                prependNewMessages(data.messages, currentFirstThreadId);
+            } else {
+                console.log('No new messages, keeping current display');
+            }
+        } else if (data.messages.length > 0) {
+            // If we can't compare, just update (first load case)
+            updateMessageList(data.messages);
+        }
         
     } catch (error) {
         console.error('Auto-refresh failed:', error);
@@ -316,6 +347,65 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function prependNewMessages(newMessages, currentFirstThreadId) {
+    const messageList = document.querySelector('.message-list');
+    if (!messageList) return;
+    
+    // Find the index where current messages start (stop when we hit the current first message)
+    let newMessagesCount = 0;
+    for (let i = 0; i < newMessages.length; i++) {
+        if (newMessages[i].thread === currentFirstThreadId) {
+            break;
+        }
+        newMessagesCount++;
+    }
+    
+    // Only prepend the truly new messages
+    const messagesToPrepend = newMessages.slice(0, newMessagesCount);
+    console.log(`Prepending ${messagesToPrepend.length} new messages`);
+    
+    if (messagesToPrepend.length === 0) {
+        return; // No new messages to add
+    }
+    
+    // Create HTML for new messages
+    let newHtml = '';
+    messagesToPrepend.forEach(message => {
+        newHtml += `
+            <div class="message-item">
+                <div class="message-header">
+                    <span class="sender">${escapeHtml(message.authors)}</span>
+                    <span class="date">${escapeHtml(message.date_relative)}</span>
+                </div>
+                <div class="subject">
+                    <a href="/thread/${escapeHtml(message.thread)}">${escapeHtml(message.subject)}</a>
+                </div>
+                <div class="tags">
+                    ${message.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    // Find the first existing message item and insert new messages before it
+    const firstExistingMessage = messageList.querySelector('.message-item');
+    if (firstExistingMessage) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = newHtml;
+        
+        // Insert each new message before the first existing one
+        while (tempDiv.firstChild) {
+            messageList.insertBefore(tempDiv.firstChild, firstExistingMessage);
+        }
+    } else {
+        // If no existing messages, just set the HTML
+        messageList.innerHTML = newHtml;
+    }
+    
+    // Note: We don't update currentOffset here because new messages are prepended
+    // The currentOffset still represents the next batch to load from the original set
+}
+
 function startAutoRefresh() {
     // Use configured refresh interval (convert seconds to milliseconds)
     const intervalMs = {{ auto_refresh_interval }} * 1000;
@@ -343,5 +433,150 @@ document.addEventListener('DOMContentLoaded', function() {
 window.addEventListener('beforeunload', function() {
     stopAutoRefresh();
 });
+
+// Infinite scroll configuration
+const initialPageSize = {{ initial_page_size }};
+const paginationSize = {{ pagination_size }};
+const infiniteScrollEnabled = {% if infinite_scroll_enabled %}true{% else %}false{% endif %};
+
+// Pagination state
+let currentOffset = {{ messages_count }};
+let isLoading = false;
+let hasMoreMessages = {% if has_more_messages %}true{% else %}false{% endif %};
+
+// Infinite scroll functionality
+async function loadMoreMessages() {
+    if (isLoading || !hasMoreMessages || !infiniteScrollEnabled) {
+        return;
+    }
+    
+    isLoading = true;
+    const loadingIndicator = document.getElementById('loading-indicator');
+    
+    try {
+        // Get current query from URL or default to inbox
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentQuery = urlParams.get('q') || 'tag:inbox';
+        
+        console.log(`Loading more messages: offset=${currentOffset}, limit=${paginationSize}`);
+        
+        const response = await fetch(`/api/load-more?q=${encodeURIComponent(currentQuery)}&offset=${currentOffset}&limit=${paginationSize}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`Loaded ${data.messages.length} more messages`);
+        
+        // Append new messages to the list
+        appendMessages(data.messages);
+        
+        // Update pagination state
+        currentOffset += data.messages.length;
+        hasMoreMessages = data.has_more;
+        
+        // Show end of results if no more messages
+        if (!hasMoreMessages) {
+            // Hide the loading indicator since there are no more messages
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
+            // Show end of results
+            const endOfResults = document.getElementById('end-of-results');
+            if (endOfResults) {
+                endOfResults.style.display = 'block';
+            }
+        }
+        
+    } catch (error) {
+        console.error('Failed to load more messages:', error);
+        // Could show an error message to the user here
+    } finally {
+        isLoading = false;
+    }
+}
+
+function appendMessages(messages) {
+    const messageList = document.getElementById('message-list');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const endOfResults = document.getElementById('end-of-results');
+    
+    messages.forEach(message => {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message-item';
+        messageDiv.innerHTML = `
+            <div class="message-header">
+                <span class="sender">${escapeHtml(message.authors)}</span>
+                <span class="date">${escapeHtml(message.date_relative)}</span>
+            </div>
+            <div class="subject">
+                <a href="/thread/${escapeHtml(message.thread)}">${escapeHtml(message.subject)}</a>
+            </div>
+            <div class="tags">
+                ${message.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+            </div>
+        `;
+        
+        // Insert before loading indicator
+        messageList.insertBefore(messageDiv, loadingIndicator);
+    });
+}
+
+// Intersection Observer for infinite scroll
+let scrollObserver;
+
+function setupInfiniteScroll() {
+    if (!infiniteScrollEnabled) {
+        console.log('Infinite scroll is disabled');
+        return;
+    }
+    
+    const options = {
+        root: null,
+        rootMargin: '100px',
+        threshold: 0.1
+    };
+    
+    scrollObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            console.log('Intersection observed:', {
+                isIntersecting: entry.isIntersecting,
+                hasMoreMessages: hasMoreMessages,
+                isLoading: isLoading,
+                willTrigger: entry.isIntersecting && hasMoreMessages && !isLoading
+            });
+            if (entry.isIntersecting && hasMoreMessages && !isLoading) {
+                console.log('Triggering loadMoreMessages()');
+                loadMoreMessages();
+            }
+        });
+    }, options);
+    
+    // Observe the loading indicator
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+        scrollObserver.observe(loadingIndicator);
+        console.log('Infinite scroll: Observing loading indicator');
+    } else {
+        console.log('Infinite scroll: No loading indicator found (no more messages)');
+    }
+}
+
+// Initialize infinite scroll when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    setupInfiniteScroll();
+    
+    // Check if we need to load more messages immediately
+    // (in case the initial page doesn't fill the viewport)
+    setTimeout(() => {
+        const messageList = document.getElementById('message-list');
+        if (messageList && messageList.scrollHeight <= window.innerHeight && hasMoreMessages) {
+            loadMoreMessages();
+        }
+    }, 100);
+});
+
+// Note: updateMessageList is now only used for initial page load
+// Auto-refresh uses prependNewMessages to preserve infinite scroll state
 </script>
 {% endblock %}
