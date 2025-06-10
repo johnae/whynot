@@ -1,0 +1,135 @@
+use clap::Parser;
+use crossterm::{
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use ratatui::{backend::CrosstermBackend, Terminal};
+use std::{io, sync::Arc, time::Duration};
+use whynot::{
+    client::create_client,
+    config::{Config, CliArgs},
+    tui::{app::App, events::EventHandler, ui},
+};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Parse CLI arguments and load configuration
+    let cli_args = CliArgs::parse();
+    let config = Config::load(cli_args)?;
+    
+    // Create client configuration from unified config
+    let client_config = config.to_client_config()?;
+    
+    // Create the notmuch client
+    let client = create_client(client_config)?;
+    let client = Arc::from(client) as Arc<dyn whynot::client::NotmuchClient>;
+    
+    // Setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    // Create app and event handler
+    let mut app = App::new(client);
+    let event_handler = EventHandler::new(Duration::from_millis(250));
+
+    // Initialize the app
+    app.initialize().await?;
+
+    // Main application loop
+    let result = run_app(&mut terminal, &mut app, &event_handler).await;
+
+    // Restore terminal
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+
+    if let Err(err) = result {
+        eprintln!("Application error: {}", err);
+    }
+
+    Ok(())
+}
+
+async fn run_app<B: ratatui::backend::Backend>(
+    terminal: &mut Terminal<B>,
+    app: &mut App,
+    event_handler: &EventHandler,
+) -> Result<(), Box<dyn std::error::Error>> {
+    loop {
+        // Draw the UI
+        terminal.draw(|f| ui::draw(f, app))?;
+
+        // Handle events
+        match event_handler.next()? {
+            whynot::tui::Event::Key(key) => {
+                let event = whynot::tui::Event::Key(key);
+                
+                // Global quit handling
+                if event.is_quit() {
+                    app.quit();
+                    break;
+                }
+
+                // State-specific event handling
+                match app.state {
+                    whynot::tui::app::AppState::EmailList => {
+                        if event.is_up() {
+                            app.navigate_up();
+                        } else if event.is_down() {
+                            app.navigate_down();
+                        } else if event.is_enter() {
+                            if let Err(e) = app.open_selected_email().await {
+                                app.set_status(format!("Error opening email: {}", e));
+                            }
+                        } else if event.is_search() {
+                            app.enter_search_mode();
+                        } else if event.is_help() {
+                            app.show_help();
+                        }
+                    }
+                    whynot::tui::app::AppState::EmailView => {
+                        if event.is_back() {
+                            app.go_back();
+                        } else if event.is_help() {
+                            app.show_help();
+                        }
+                    }
+                    whynot::tui::app::AppState::Help => {
+                        // Any key closes help
+                        app.go_back();
+                    }
+                    whynot::tui::app::AppState::Search => {
+                        if event.is_back() {
+                            app.go_back();
+                        }
+                        // TODO: Handle search input
+                    }
+                    whynot::tui::app::AppState::Compose => {
+                        if event.is_back() {
+                            app.go_back();
+                        }
+                        // TODO: Handle compose input
+                    }
+                }
+            }
+            whynot::tui::Event::Resize(_, _) => {
+                // Terminal was resized, redraw will happen on next loop
+            }
+            whynot::tui::Event::Tick => {
+                // Clear status message after some time
+                if app.status_message.is_some() {
+                    // TODO: Implement timed status clearing
+                }
+            }
+        }
+
+        if app.should_quit {
+            break;
+        }
+    }
+
+    Ok(())
+}

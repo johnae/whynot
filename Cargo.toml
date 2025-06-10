@@ -19,6 +19,10 @@ path = "src/bin/test-gallery-server.rs"
 name = "debug-infinite-scroll"
 path = "src/bin/debug_infinite_scroll.rs"
 
+[[bin]]
+name = "whynot-tui"
+path = "src/bin/whynot-tui.rs"
+
 
 [features]
 test-utils = []
@@ -56,6 +60,10 @@ base64 = "0.22"
 reqwest = { version = "0.11", features = ["cookies", "json"] }
 regex = "1.0"
 scraper = "0.20"
+
+# TUI dependencies
+ratatui = "0.29"
+crossterm = "0.28"
 
 [dev-dependencies]
 reqwest = { version = "0.11", features = ["cookies", "json"] }
