@@ -40,6 +40,7 @@ pub mod config;
 pub mod error;
 pub mod mail_sender;
 pub mod search;
+pub mod text_renderer;
 pub mod thread;
 pub mod web;
 

@@ -18,13 +18,20 @@ This project uses [Jujutsu (jj)](https://github.com/martinvonz/jj) instead of gi
 
 **Starting a new feature:**
 ```bash
-# Create a new change for your feature - please always do this as you start new work. You can combine it with -m to avoid the describe step.
-jj new
+# First check current status
+jj status
 
-# Describe what you're implementing before starting work
+# If the working copy is empty and has no description set, just set a description:
 jj describe -m 'feat(search): add advanced filtering options'
 # or for bug fixes:
 jj describe -m 'fix(web): resolve CSS layout issue in thread view'
+
+# If there are already changes or a description is set, create a new change:
+jj new
+jj describe -m 'feat(search): add advanced filtering options'
+
+# You can also combine these steps when creating a new change:
+jj new -m 'feat(search): add advanced filtering options'
 ```
 
 **Commit conventions:**
