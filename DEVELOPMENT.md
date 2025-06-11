@@ -47,6 +47,25 @@ Please follow clippy hints and suggestions. Run `devenv shell cargo clippy` regu
 
 - When running clippy, always run with --all-targets (so we fix any tests as well for example).
 
+### Code Formatting
+
+**Always run `rustfmt` after every code change** to maintain consistent code style throughout the project.
+
+The easiest way is to integrate rustfmt into your editor:
+- **Helix**: Add `auto-format = true` to your languages.toml config for Rust
+- **VS Code**: Install rust-analyzer extension and enable format on save
+- **Vim/Neovim**: Use rust.vim or nvim-lspconfig with format on save
+- **Other editors**: Check your editor's Rust plugin documentation
+
+If you don't have editor integration, run formatting manually after making changes:
+
+```bash
+devenv shell cargo fmt        # Format all code
+devenv shell cargo fmt --check   # Check if code is formatted (CI/scripts)
+```
+
+**Important**: Do not commit unformatted code. Always ensure your changes are properly formatted before creating commits.
+
 ## Notmuch Documentation
 
 Please use the notmuch documentation freely for understanding how to use the cli tool. You can find the documentation here:
