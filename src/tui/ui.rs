@@ -61,11 +61,17 @@ fn draw_email_list(f: &mut Frame, app: &mut App, area: Rect) {
     let mut state = ListState::default();
     state.select(Some(app.selected_email));
 
+    let title = if app.search_query == "tag:inbox" {
+        format!("Inbox ({} emails)", app.email_count())
+    } else {
+        format!("Search: {} ({} results)", app.search_query, app.email_count())
+    };
+
     let list = List::new(items)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!("Inbox ({} emails)", app.email_count()))
+                .title(title)
         )
         .highlight_style(Style::default().bg(Color::Blue).fg(Color::White));
 
@@ -139,9 +145,23 @@ fn draw_email_body(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_search(f: &mut Frame, app: &mut App, area: Rect) {
-    let paragraph = Paragraph::new(format!("Search: {}", app.search_query))
-        .block(Block::default().borders(Borders::ALL).title("Search"));
-    f.render_widget(paragraph, area);
+    // Create a centered modal for search input
+    let modal_area = centered_rect(60, 20, area);
+    
+    // Clear the background
+    f.render_widget(Clear, modal_area);
+    
+    // Draw the search input with cursor
+    let input_text = format!("Search: {}_", app.search_input);
+    let paragraph = Paragraph::new(input_text)
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title("Search (Enter to search, Esc to cancel)")
+            .style(Style::default().fg(Color::Yellow))
+        )
+        .wrap(Wrap { trim: false });
+    
+    f.render_widget(paragraph, modal_area);
 }
 
 fn draw_help(f: &mut Frame, _app: &mut App, area: Rect) {

@@ -102,10 +102,25 @@ async fn run_app<B: ratatui::backend::Backend>(
                         app.go_back();
                     }
                     whynot::tui::app::AppState::Search => {
-                        if event.is_back() {
-                            app.go_back();
+                        match key.code {
+                            crossterm::event::KeyCode::Esc => {
+                                app.go_back();
+                            }
+                            crossterm::event::KeyCode::Enter => {
+                                if let Err(e) = app.execute_search().await {
+                                    app.set_status(format!("Search error: {}", e));
+                                } else {
+                                    app.set_status(format!("Search results for: {}", app.search_query));
+                                }
+                            }
+                            crossterm::event::KeyCode::Backspace => {
+                                app.handle_search_backspace();
+                            }
+                            crossterm::event::KeyCode::Char(c) => {
+                                app.handle_search_char(c);
+                            }
+                            _ => {}
                         }
-                        // TODO: Handle search input
                     }
                     whynot::tui::app::AppState::Compose => {
                         if event.is_back() {

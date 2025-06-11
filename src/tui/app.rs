@@ -37,6 +37,9 @@ pub struct App {
     /// Current search query
     pub search_query: String,
     
+    /// Search input buffer (for typing)
+    pub search_input: String,
+    
     /// Scroll position in various views
     pub scroll_position: usize,
     
@@ -64,6 +67,7 @@ impl App {
             current_email: None,
             current_email_body: None,
             search_query: String::new(),
+            search_input: String::new(),
             scroll_position: 0,
             status_message: None,
             client,
@@ -141,6 +145,7 @@ impl App {
     pub fn enter_search_mode(&mut self) {
         self.state = AppState::Search;
         self.search_query.clear();
+        self.search_input = String::new();
     }
 
     /// Show help overlay
@@ -173,6 +178,28 @@ impl App {
         self.search_results.get(self.selected_email)
     }
 
+    /// Handle character input in search mode
+    pub fn handle_search_char(&mut self, c: char) {
+        self.search_input.push(c);
+    }
+    
+    /// Handle backspace in search mode
+    pub fn handle_search_backspace(&mut self) {
+        self.search_input.pop();
+    }
+    
+    /// Execute the search based on current input
+    pub async fn execute_search(&mut self) -> Result<(), NotmuchError> {
+        if !self.search_input.is_empty() {
+            self.search_query = self.search_input.clone();
+            self.load_search_results().await?;
+        } else {
+            // Empty search returns to inbox
+            self.load_inbox().await?;
+        }
+        Ok(())
+    }
+    
     /// Process email body content, converting HTML to text if needed
     pub async fn process_email_body(&self, message: &Message) -> Option<String> {
         if message.body.is_empty() {
