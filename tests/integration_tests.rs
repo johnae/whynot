@@ -90,7 +90,7 @@ fn test_thread_messages_have_expected_fields() {
     // Verify headers
     assert_eq!(
         first_message.headers.subject,
-        "Uppföljningsmöte mellan Alice och Bob, Finance Company AB"
+        Some("Uppföljningsmöte mellan Alice och Bob, Finance Company AB".to_string())
     );
     assert_eq!(
         first_message.headers.from,
@@ -98,7 +98,7 @@ fn test_thread_messages_have_expected_fields() {
     );
     assert_eq!(
         first_message.headers.to,
-        "\"user@example.com\" <user@example.com>"
+        Some("\"user@example.com\" <user@example.com>".to_string())
     );
     assert_eq!(
         first_message.headers.reply_to,

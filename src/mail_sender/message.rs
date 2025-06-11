@@ -1,9 +1,9 @@
 //! Message composition types for sending email.
 
-use std::collections::HashMap;
-use crate::error::Result;
 use crate::body::BodyPart;
+use crate::error::Result;
 use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// A composable email message for sending.
@@ -69,15 +69,15 @@ impl ComposableMessage {
         if let Some(from) = &self.from {
             message.push_str(&format!("From: {}\r\n", from));
         }
-        
+
         if !self.to.is_empty() {
             message.push_str(&format!("To: {}\r\n", self.to.join(", ")));
         }
-        
+
         if !self.cc.is_empty() {
             message.push_str(&format!("Cc: {}\r\n", self.cc.join(", ")));
         }
-        
+
         if !self.bcc.is_empty() {
             message.push_str(&format!("Bcc: {}\r\n", self.bcc.join(", ")));
         }
@@ -90,7 +90,7 @@ impl ComposableMessage {
         if let Some(in_reply_to) = &self.in_reply_to {
             message.push_str(&format!("In-Reply-To: {}\r\n", in_reply_to));
         }
-        
+
         if !self.references.is_empty() {
             message.push_str(&format!("References: {}\r\n", self.references.join(" ")));
         }
@@ -103,11 +103,14 @@ impl ComposableMessage {
         // MIME headers if needed
         let has_html = self.html_body.is_some();
         let has_attachments = !self.attachments.is_empty();
-        
+
         if has_html || has_attachments {
             let boundary = format!("boundary_{}", Uuid::new_v4());
             message.push_str("MIME-Version: 1.0\r\n");
-            message.push_str(&format!("Content-Type: multipart/mixed; boundary=\"{}\"\r\n", boundary));
+            message.push_str(&format!(
+                "Content-Type: multipart/mixed; boundary=\"{}\"\r\n",
+                boundary
+            ));
             message.push_str("\r\n");
 
             // Text part
@@ -132,10 +135,16 @@ impl ComposableMessage {
             for attachment in &self.attachments {
                 message.push_str(&format!("--{}\r\n", boundary));
                 message.push_str(&format!("Content-Type: {}\r\n", attachment.content_type));
-                message.push_str(&format!("Content-Disposition: attachment; filename=\"{}\"\r\n", attachment.filename));
+                message.push_str(&format!(
+                    "Content-Disposition: attachment; filename=\"{}\"\r\n",
+                    attachment.filename
+                ));
                 message.push_str("Content-Transfer-Encoding: base64\r\n");
                 message.push_str("\r\n");
-                message.push_str(&base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &attachment.data));
+                message.push_str(&base64::Engine::encode(
+                    &base64::engine::general_purpose::STANDARD,
+                    &attachment.data,
+                ));
                 message.push_str("\r\n");
             }
 
@@ -162,25 +171,25 @@ impl ComposableMessage {
 
         // Build References header
         let mut references = vec![];
-        
+
         // Check if original has References header
         if let Some(orig_refs) = original.headers.get("references") {
             // Parse space-separated message IDs
             references.extend(orig_refs.split_whitespace().map(|s| s.to_string()));
         }
-        
+
         // Add the original message ID to references
         references.push(original.id.clone());
-        
+
         for reference in references {
             builder = builder.add_reference(reference);
         }
 
         // Set subject with Re: prefix if not already present
-        let subject = if original.headers.subject.starts_with("Re: ") {
-            original.headers.subject.clone()
-        } else {
-            format!("Re: {}", original.headers.subject)
+        let subject = match &original.headers.subject {
+            Some(subj) if subj.starts_with("Re: ") => subj.clone(),
+            Some(subj) => format!("Re: {}", subj),
+            None => "Re: (No subject)".to_string(),
         };
         builder = builder.subject(subject);
 
@@ -188,14 +197,14 @@ impl ComposableMessage {
         if reply_all {
             // Reply to sender
             builder = builder.to(original.headers.from.clone());
-            
+
             // Add original To recipients (except ourselves if we can determine that)
-            if let Some(to_header) = original.headers.get("to") {
-                for addr in to_header.split(',').map(|s| s.trim()) {
+            if let Some(to) = &original.headers.to {
+                for addr in to.split(',').map(|s| s.trim()) {
                     builder = builder.to(addr.to_string());
                 }
             }
-            
+
             // Add original Cc recipients
             if let Some(cc_header) = original.headers.get("cc") {
                 for addr in cc_header.split(',').map(|s| s.trim()) {
@@ -222,10 +231,10 @@ impl ComposableMessage {
         let mut builder = MessageBuilder::new();
 
         // Set subject with Fwd: prefix if not already present
-        let subject = if original.headers.subject.starts_with("Fwd: ") {
-            original.headers.subject.clone()
-        } else {
-            format!("Fwd: {}", original.headers.subject)
+        let subject = match &original.headers.subject {
+            Some(subj) if subj.starts_with("Fwd: ") => subj.clone(),
+            Some(subj) => format!("Fwd: {}", subj),
+            None => "Fwd: (No subject)".to_string(),
         };
         builder = builder.subject(subject);
 
@@ -346,14 +355,14 @@ impl MessageBuilder {
     /// Returns an error if required fields are missing.
     pub fn build(self) -> Result<ComposableMessage> {
         // Generate Message-ID if not provided
-        let message_id = self.message_id.unwrap_or_else(|| {
-            format!("<{}@whynot>", Uuid::new_v4())
-        });
+        let message_id = self
+            .message_id
+            .unwrap_or_else(|| format!("<{}@whynot>", Uuid::new_v4()));
 
         // Ensure we have required fields
         if self.to.is_empty() && self.cc.is_empty() && self.bcc.is_empty() {
             return Err(crate::error::Error::InvalidInput(
-                "Message must have at least one recipient".to_string()
+                "Message must have at least one recipient".to_string(),
             ));
         }
 
@@ -382,17 +391,16 @@ impl MessageBuilder {
 /// Quote the body of a message for replying.
 fn quote_message_body(message: &crate::thread::Message) -> String {
     let mut quoted = String::new();
-    
+
     // Add attribution line
     quoted.push_str(&format!(
         "On {}, {} wrote:\n",
-        message.date_relative,
-        message.headers.from
+        message.date_relative, message.headers.from
     ));
 
     // Extract plain text body
     let body_text = extract_plain_text_body(message);
-    
+
     // Quote each line
     for line in body_text.lines() {
         quoted.push_str("> ");
@@ -406,22 +414,25 @@ fn quote_message_body(message: &crate::thread::Message) -> String {
 /// Format a message for forwarding.
 fn format_forward_body(message: &crate::thread::Message) -> String {
     let mut forward = String::new();
-    
+
     forward.push_str("---------- Forwarded message ----------\n");
     forward.push_str(&format!("From: {}\n", message.headers.from));
     forward.push_str(&format!("Date: {}\n", message.date_relative));
-    forward.push_str(&format!("Subject: {}\n", message.headers.subject));
-    
-    if let Some(to) = message.headers.get("to") {
+    forward.push_str(&format!(
+        "Subject: {}\n",
+        message.headers.subject.as_deref().unwrap_or("(No subject)")
+    ));
+
+    if let Some(to) = &message.headers.to {
         forward.push_str(&format!("To: {}\n", to));
     }
-    
+
     forward.push('\n');
-    
+
     // Include original body
     let body_text = extract_plain_text_body(message);
     forward.push_str(&body_text);
-    
+
     forward
 }
 
@@ -438,11 +449,9 @@ fn extract_plain_text_body(message: &crate::thread::Message) -> String {
 /// Recursively extract text from a body part.
 fn extract_text_from_part(part: &BodyPart) -> Option<String> {
     use crate::body::BodyContent;
-    
+
     match &part.content {
-        BodyContent::Text(text) if part.content_type == "text/plain" => {
-            Some(text.clone())
-        }
+        BodyContent::Text(text) if part.content_type == "text/plain" => Some(text.clone()),
         BodyContent::Multipart(parts) => {
             for subpart in parts {
                 if let Some(text) = extract_text_from_part(subpart) {

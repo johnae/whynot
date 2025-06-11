@@ -37,20 +37,25 @@ async fn spawn_test_server() -> TestServer {
         let mbox = mbox_builder.build();
         test_notmuch.add_mbox(&mbox).await.unwrap();
 
-        let client = std::sync::Arc::new(test_notmuch.client()) as std::sync::Arc<dyn NotmuchClient>;
-        
+        let client =
+            std::sync::Arc::new(test_notmuch.client()) as std::sync::Arc<dyn NotmuchClient>;
+
         // Debug: Test the client directly
         println!("Testing client search directly...");
         match client.search("*").await {
             Ok(results) => println!("Direct search found {} messages", results.len()),
             Err(e) => println!("Direct search failed: {}", e),
         }
-        
+
         match client.search_paginated("*", 0, 5).await {
-            Ok((results, total)) => println!("Direct paginated search found {} messages, total: {:?}", results.len(), total),
+            Ok((results, total)) => println!(
+                "Direct paginated search found {} messages, total: {:?}",
+                results.len(),
+                total
+            ),
             Err(e) => println!("Direct paginated search failed: {}", e),
         }
-        
+
         let config = WebConfig {
             bind_address: ([127, 0, 0, 1], 0).into(),
             base_url: "http://localhost".to_string(),
@@ -67,7 +72,7 @@ async fn spawn_test_server() -> TestServer {
             client,
             config,
         };
-        
+
         let (addr, state) = create_server_with_state(state).await;
         TestServer {
             addr,
@@ -96,12 +101,9 @@ async fn spawn_test_server() -> TestServer {
             client: std::sync::Arc::from(client),
             config,
         };
-        
+
         let (addr, state) = create_server_with_state(state).await;
-        TestServer {
-            addr,
-            state,
-        }
+        TestServer { addr, state }
     }
 }
 
@@ -124,11 +126,11 @@ async fn create_server_with_state(state: AppState) -> (SocketAddr, AppState) {
 async fn test_search_with_pagination_parameters() {
     // Test that search_paginated method exists on the trait
     let client = create_client(ClientConfig::local()).unwrap();
-    
-    // Test search_paginated method - should either succeed or fail gracefully 
+
+    // Test search_paginated method - should either succeed or fail gracefully
     // In CI/testing environments without notmuch config, this will fail with a config error
     let results = client.search_paginated("*", 0, 10).await;
-    
+
     // Accept either success or the expected "cannot load config file" error
     match results {
         Ok(_) => {
@@ -137,9 +139,13 @@ async fn test_search_with_pagination_parameters() {
         }
         Err(e) => {
             let error_msg = format!("{:?}", e);
-            if error_msg.contains("cannot load config file") || error_msg.contains("CommandFailed") {
+            if error_msg.contains("cannot load config file") || error_msg.contains("CommandFailed")
+            {
                 // Expected failure in unconfigured environments - this is acceptable
-                println!("Pagination test expectedly failed due to notmuch configuration: {:?}", e);
+                println!(
+                    "Pagination test expectedly failed due to notmuch configuration: {:?}",
+                    e
+                );
             } else {
                 // Unexpected error - this should cause test failure
                 panic!("Unexpected error from search_paginated: {:?}", e);
@@ -156,7 +162,7 @@ async fn test_load_more_endpoint() {
     let client = reqwest::Client::new();
     let response = client
         .get(format!("http://{}/api/load-more", test_server.addr))
-        .query(&[("q", "*"), ("offset", "0"), ("limit", "5")])  // Changed to offset 0 to get real data
+        .query(&[("q", "*"), ("offset", "0"), ("limit", "5")]) // Changed to offset 0 to get real data
         .send()
         .await
         .unwrap();
@@ -165,13 +171,13 @@ async fn test_load_more_endpoint() {
     println!("Response status: {}", response.status());
     let response_body = response.text().await.unwrap();
     println!("Response body: {}", response_body);
-    
+
     if response_body.contains("\"messages\"") {
         println!("SUCCESS: Endpoint is working!");
     } else {
         println!("ERROR: Unexpected response format");
     }
-    
+
     // Don't run the rest of the test for now - just return
 }
 
@@ -235,7 +241,7 @@ async fn test_infinite_scroll_with_many_messages() {
     // Should contain the first 5 messages
     assert!(body.contains("Test message 1"));
     assert!(body.contains("Test message 5"));
-    
+
     // Should NOT contain later messages on initial load
     assert!(!body.contains("Test message 10"));
     assert!(!body.contains("Test message 20"));
@@ -279,7 +285,7 @@ async fn test_pagination_configuration() {
         .unwrap();
 
     let body = response.text().await.unwrap();
-    
+
     // Should include configuration in JavaScript
     assert!(body.contains("initialPageSize"));
     assert!(body.contains("paginationSize"));
@@ -292,7 +298,7 @@ async fn test_pagination_preserves_search_queries() {
     let test_server = spawn_test_server().await;
 
     let client = reqwest::Client::new();
-    
+
     // Test load-more with search query
     let response = client
         .get(format!("http://{}/api/load-more", test_server.addr))
@@ -304,11 +310,15 @@ async fn test_pagination_preserves_search_queries() {
     assert_eq!(response.status(), 200);
     let body: serde_json::Value = response.json().await.unwrap();
     assert!(body.get("messages").is_some());
-    
+
     // Test load-more with complex search query
     let response = client
         .get(format!("http://{}/api/load-more", test_server.addr))
-        .query(&[("q", "from:alice AND tag:important"), ("offset", "5"), ("limit", "3")])
+        .query(&[
+            ("q", "from:alice AND tag:important"),
+            ("offset", "5"),
+            ("limit", "3"),
+        ])
         .send()
         .await
         .unwrap();
@@ -322,7 +332,7 @@ async fn test_pagination_error_handling() {
     let test_server = spawn_test_server().await;
 
     let client = reqwest::Client::new();
-    
+
     // Test with invalid offset
     let response = client
         .get(format!("http://{}/api/load-more", test_server.addr))
@@ -435,10 +445,14 @@ async fn test_pagination_integrates_with_auto_refresh() {
 
     assert_eq!(response.status(), 200);
     let body: serde_json::Value = response.json().await.unwrap();
-    
-    // Should include messages in refresh - test depends on test data availability 
+
+    // Should include messages in refresh - test depends on test data availability
     let messages = body["messages"].as_array().unwrap();
-    assert!(messages.len() >= 5, "Expected at least 5 messages, got {}", messages.len()); // At least some messages
+    assert!(
+        messages.len() >= 5,
+        "Expected at least 5 messages, got {}",
+        messages.len()
+    ); // At least some messages
 }
 
 #[tokio::test]
@@ -447,7 +461,7 @@ async fn test_pagination_memory_efficiency() {
     let test_server = spawn_test_server().await;
 
     let client = reqwest::Client::new();
-    
+
     // Request large offset but small limit
     let response = client
         .get(format!("http://{}/api/load-more", test_server.addr))
@@ -458,7 +472,7 @@ async fn test_pagination_memory_efficiency() {
 
     assert_eq!(response.status(), 200);
     let body: serde_json::Value = response.json().await.unwrap();
-    
+
     let messages = body["messages"].as_array().unwrap();
     // Should return at most 5 messages, even with large offset
     assert!(messages.len() <= 5);

@@ -64,9 +64,7 @@ impl MailSenderConfig {
             port: std::env::var("MSMTP_PORT")
                 .ok()
                 .and_then(|p| p.parse().ok()),
-            identity_file: std::env::var("MSMTP_IDENTITY_FILE")
-                .ok()
-                .map(PathBuf::from),
+            identity_file: std::env::var("MSMTP_IDENTITY_FILE").ok().map(PathBuf::from),
             msmtp_path: std::env::var("MSMTP_PATH").ok().map(PathBuf::from),
             config_path: std::env::var("MSMTP_CONFIG").ok().map(PathBuf::from),
         })

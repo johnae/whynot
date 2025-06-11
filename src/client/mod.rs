@@ -214,7 +214,12 @@ pub trait NotmuchClient: Send + Sync {
     /// # Ok(())
     /// # }
     /// ```
-    async fn search_paginated(&self, query: &str, offset: usize, limit: usize) -> Result<(Vec<SearchItem>, Option<usize>)>;
+    async fn search_paginated(
+        &self,
+        query: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<SearchItem>, Option<usize>)>;
 
     /// Show messages matching a query in thread format.
     ///

@@ -1,6 +1,6 @@
 use clap::Parser;
 use whynot::client::create_client;
-use whynot::config::{Config, CliArgs};
+use whynot::config::{CliArgs, Config};
 use whynot::mail_sender::create_mail_sender;
 use whynot::web::{AppState, WebConfig, create_app};
 
@@ -20,11 +20,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create client configuration from unified config
     let client_config = config.to_client_config()?;
-    
+
     // Log configuration mode
-    let is_remote = config.mail.reading.connection_type.as_deref() == Some("remote") 
+    let is_remote = config.mail.reading.connection_type.as_deref() == Some("remote")
         || config.mail.reading.host.is_some();
-    
+
     if is_remote {
         tracing::info!(
             "Using remote notmuch at {}@{}:{}",
@@ -70,13 +70,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Some(sender)
                     }
                     Err(e) => {
-                        tracing::warn!("Mail sender test failed: {}. Mail sending will be disabled.", e);
+                        tracing::warn!(
+                            "Mail sender test failed: {}. Mail sending will be disabled.",
+                            e
+                        );
                         None
                     }
                 }
             }
             Err(e) => {
-                tracing::warn!("Failed to create mail sender: {}. Mail sending will be disabled.", e);
+                tracing::warn!(
+                    "Failed to create mail sender: {}. Mail sending will be disabled.",
+                    e
+                );
                 None
             }
         }
@@ -128,9 +134,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-
 fn display_client_info(config: &Config) {
-    let is_remote = config.mail.reading.connection_type.as_deref() == Some("remote") 
+    let is_remote = config.mail.reading.connection_type.as_deref() == Some("remote")
         || config.mail.reading.host.is_some();
 
     if is_remote {
@@ -168,14 +173,14 @@ fn display_client_info(config: &Config) {
     }
 
     // Display mail sending configuration if configured
-    let sending_configured = config.mail.sending.connection_type.is_some() 
-        || config.mail.sending.host.is_some() 
+    let sending_configured = config.mail.sending.connection_type.is_some()
+        || config.mail.sending.host.is_some()
         || config.mail.sending.msmtp_path.is_some();
-    
+
     if sending_configured {
-        let is_sending_remote = config.mail.sending.connection_type.as_deref() == Some("remote") 
+        let is_sending_remote = config.mail.sending.connection_type.as_deref() == Some("remote")
             || config.mail.sending.host.is_some();
-        
+
         if is_sending_remote {
             println!("Mail sending: Remote (via SSH)");
             if let Some(host) = &config.mail.sending.host {
@@ -187,7 +192,7 @@ fn display_client_info(config: &Config) {
         } else {
             println!("Mail sending: Local");
         }
-        
+
         if let Some(path) = &config.mail.sending.msmtp_path {
             println!("MSMTP path: {}", path);
         }

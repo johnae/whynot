@@ -260,7 +260,10 @@ mod tests {
         let message_node = &first_level.0[0];
         let message = &message_node.0;
 
-        assert_eq!(message.id, "a43c8c7576ec4d2db2148b526f6be21d@financecompany.example");
+        assert_eq!(
+            message.id,
+            "a43c8c7576ec4d2db2148b526f6be21d@financecompany.example"
+        );
         assert_eq!(message.tags.len(), 4);
         assert_eq!(message.body.len(), 1);
 
@@ -317,9 +320,9 @@ mod tests {
             }],
             crypto: CryptoInfo::default(),
             headers: Headers {
-                subject: "Test Subject".to_string(),
+                subject: Some("Test Subject".to_string()),
                 from: "sender@example.com".to_string(),
-                to: "recipient@example.com".to_string(),
+                to: Some("recipient@example.com".to_string()),
                 reply_to: None,
                 date: "Mon, 1 Jan 2024 12:00:00 +0000".to_string(),
                 additional: std::collections::HashMap::new(),
@@ -356,9 +359,9 @@ mod tests {
             }],
             crypto: CryptoInfo::default(),
             headers: Headers {
-                subject: "Test Subject".to_string(),
+                subject: Some("Test Subject".to_string()),
                 from: "sender@example.com".to_string(),
-                to: "recipient@example.com".to_string(),
+                to: Some("recipient@example.com".to_string()),
                 reply_to: None,
                 date: "Mon, 1 Jan 2024 12:00:00 +0000".to_string(),
                 additional: std::collections::HashMap::new(),
@@ -384,9 +387,9 @@ mod tests {
             body: vec![],
             crypto: CryptoInfo::default(),
             headers: Headers {
-                subject: "Test Subject".to_string(),
+                subject: Some("Test Subject".to_string()),
                 from: "sender@example.com".to_string(),
-                to: "recipient@example.com".to_string(),
+                to: Some("recipient@example.com".to_string()),
                 reply_to: None,
                 date: "Mon, 1 Jan 2024 12:00:00 +0000".to_string(),
                 additional: std::collections::HashMap::new(),
@@ -405,9 +408,9 @@ mod tests {
             body: vec![],
             crypto: CryptoInfo::default(),
             headers: Headers {
-                subject: "Test Subject".to_string(),
+                subject: Some("Test Subject".to_string()),
                 from: "sender@example.com".to_string(),
-                to: "recipient@example.com".to_string(),
+                to: Some("recipient@example.com".to_string()),
                 reply_to: None,
                 date: "Mon, 1 Jan 2024 12:00:00 +0000".to_string(),
                 additional: std::collections::HashMap::new(),
@@ -426,9 +429,9 @@ mod tests {
             body: vec![],
             crypto: CryptoInfo::default(),
             headers: Headers {
-                subject: "Test Subject".to_string(),
+                subject: Some("Test Subject".to_string()),
                 from: "sender@example.com".to_string(),
-                to: "recipient@example.com".to_string(),
+                to: Some("recipient@example.com".to_string()),
                 reply_to: None,
                 date: "Mon, 1 Jan 2024 12:00:00 +0000".to_string(),
                 additional: std::collections::HashMap::new(),

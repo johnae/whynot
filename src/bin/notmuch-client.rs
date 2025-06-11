@@ -282,11 +282,28 @@ async fn show(client: &dyn NotmuchClient, query: &str, raw: bool) -> Result<()> 
 
         // Basic headers
         println!("{} {}", "From:".dimmed(), message.headers.from);
-        println!("{} {}", "To:".dimmed(), message.headers.to);
+        println!(
+            "{} {}",
+            "To:".dimmed(),
+            message
+                .headers
+                .to
+                .as_deref()
+                .unwrap_or("Undisclosed recipients")
+        );
         if let Some(reply_to) = &message.headers.reply_to {
             println!("{} {}", "Reply-To:".dimmed(), reply_to);
         }
-        println!("{} {}", "Subject:".dimmed(), message.headers.subject.bold());
+        println!(
+            "{} {}",
+            "Subject:".dimmed(),
+            message
+                .headers
+                .subject
+                .as_deref()
+                .unwrap_or("(No subject)")
+                .bold()
+        );
         println!("{} {}", "Date:".dimmed(), message.headers.date);
 
         // Tags

@@ -1,10 +1,10 @@
-use whynot::client::{NotmuchClient};
+use whynot::client::NotmuchClient;
 use whynot::web::{AppState, WebConfig, create_app};
 
 #[tokio::main]
 async fn main() {
     println!("Creating test server to debug infinite scroll...");
-    
+
     #[cfg(feature = "test-utils")]
     {
         use whynot::test_utils::mbox::{EmailMessage, MboxBuilder};
@@ -37,7 +37,8 @@ async fn main() {
         let state = AppState {
             mail_sender: None,
             user_config: whynot::config::UserConfig::default(),
-            client: std::sync::Arc::from(test_notmuch.client()) as std::sync::Arc<dyn NotmuchClient>,
+            client: std::sync::Arc::from(test_notmuch.client())
+                as std::sync::Arc<dyn NotmuchClient>,
             config,
         };
 
@@ -46,13 +47,17 @@ async fn main() {
         println!("Starting server on http://127.0.0.1:8082");
         println!("Visit http://127.0.0.1:8082/inbox to test infinite scroll");
         println!("Check browser console for JavaScript debugging output");
-        
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:8082").await.unwrap();
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:8082")
+            .await
+            .unwrap();
         axum::serve(listener, app).await.unwrap();
     }
-    
+
     #[cfg(not(feature = "test-utils"))]
     {
-        println!("test-utils feature not enabled. Run with: cargo run --features test-utils --bin debug_infinite_scroll");
+        println!(
+            "test-utils feature not enabled. Run with: cargo run --features test-utils --bin debug_infinite_scroll"
+        );
     }
 }

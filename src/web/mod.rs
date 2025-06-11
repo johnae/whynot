@@ -11,8 +11,8 @@ use axum::{
     response::Redirect,
     routing::{get, post},
 };
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::services::ServeDir;
@@ -81,9 +81,18 @@ pub fn create_app(state: AppState) -> Router {
             "/test/email-gallery/:email_name",
             get(test_email_viewer_handler),
         )
-        .route("/compose", get(compose_get_handler).post(compose_post_handler))
-        .route("/thread/:id/reply", get(reply_get_handler).post(reply_post_handler))
-        .route("/thread/:id/forward", get(forward_get_handler).post(forward_post_handler))
+        .route(
+            "/compose",
+            get(compose_get_handler).post(compose_post_handler),
+        )
+        .route(
+            "/thread/:id/reply",
+            get(reply_get_handler).post(reply_post_handler),
+        )
+        .route(
+            "/thread/:id/forward",
+            get(forward_get_handler).post(forward_post_handler),
+        )
         .nest_service("/static", ServeDir::new("src/web/static"))
         .with_state(state)
 }
@@ -108,9 +117,17 @@ fn get_theme_from_headers(headers: &HeaderMap) -> String {
 
 async fn inbox_handler(State(state): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
     // Search for messages tagged with "inbox" with pagination
-    let (messages, total_count) = match state.client.search_paginated("tag:inbox", 0, state.config.initial_page_size).await {
+    let (messages, total_count) = match state
+        .client
+        .search_paginated("tag:inbox", 0, state.config.initial_page_size)
+        .await
+    {
         Ok((results, total_count)) => {
-            tracing::info!("Found {} messages in inbox (initial page), total: {:?}", results.len(), total_count);
+            tracing::info!(
+                "Found {} messages in inbox (initial page), total: {:?}",
+                results.len(),
+                total_count
+            );
             (results, total_count)
         }
         Err(e) => {
@@ -121,7 +138,7 @@ async fn inbox_handler(State(state): State<AppState>, headers: HeaderMap) -> imp
 
     let theme = get_theme_from_headers(&headers);
     let messages_count = messages.len();
-    
+
     // Calculate if there are more messages available
     let has_more_messages = if let Some(total) = total_count {
         messages_count < total
@@ -216,7 +233,11 @@ async fn search_handler(
         query_parts.join(" AND ")
     };
 
-    let (messages, total_count) = match state.client.search_paginated(&query, 0, state.config.initial_page_size).await {
+    let (messages, total_count) = match state
+        .client
+        .search_paginated(&query, 0, state.config.initial_page_size)
+        .await
+    {
         Ok((results, total_count)) => {
             tracing::info!(
                 "Search query '{}' returned {} results (initial page), total: {:?}",
@@ -234,7 +255,7 @@ async fn search_handler(
 
     let theme = get_theme_from_headers(&headers);
     let messages_count = messages.len();
-    
+
     // Calculate if there are more messages available
     let has_more_messages = if let Some(total) = total_count {
         messages_count < total
@@ -859,14 +880,19 @@ async fn refresh_query_handler(
 ) -> impl IntoResponse {
     // Use provided query or default to inbox
     let query = params.q.unwrap_or_else(|| "tag:inbox".to_string());
-    
+
     // Use paginated search to avoid large response payloads that cause network timeouts
     // Limit to the initial page size to match what the user initially sees
     let limit = state.config.initial_page_size;
-    
+
     let messages = match state.client.search_paginated(&query, 0, limit).await {
         Ok((results, _total_count)) => {
-            tracing::info!("Refresh query '{}' returned {} results (limited to {})", query, results.len(), limit);
+            tracing::info!(
+                "Refresh query '{}' returned {} results (limited to {})",
+                query,
+                results.len(),
+                limit
+            );
             results
         }
         Err(e) => {
@@ -907,9 +933,14 @@ async fn load_more_handler(
     let query = params.q.unwrap_or_else(|| "tag:inbox".to_string());
     let offset = params.offset.unwrap_or(0);
     let limit = params.limit.unwrap_or(state.config.pagination_size);
-    
-    tracing::info!("load_more_handler: query='{}', offset={}, limit={}", query, offset, limit);
-    
+
+    tracing::info!(
+        "load_more_handler: query='{}', offset={}, limit={}",
+        query,
+        offset,
+        limit
+    );
+
     match state.client.search_paginated(&query, offset, limit).await {
         Ok((messages, total_count)) => {
             let has_more = if let Some(total) = total_count {
@@ -918,12 +949,16 @@ async fn load_more_handler(
                 // If we don't have total count, assume there are more if we got exactly `limit` messages
                 messages.len() == limit
             };
-            
+
             tracing::info!(
                 "Load more query '{}' (offset={}, limit={}) returned {} results, has_more={}",
-                query, offset, limit, messages.len(), has_more
+                query,
+                offset,
+                limit,
+                messages.len(),
+                has_more
             );
-            
+
             let response = LoadMoreResponse {
                 messages,
                 has_more,
@@ -931,12 +966,12 @@ async fn load_more_handler(
                 offset,
                 limit,
             };
-            
+
             Json(response).into_response()
         }
         Err(e) => {
             tracing::error!("Failed to load more for query '{}': {:?}", query, e);
-            
+
             let error_response = LoadMoreResponse {
                 messages: vec![],
                 has_more: false,
@@ -944,7 +979,7 @@ async fn load_more_handler(
                 offset,
                 limit,
             };
-            
+
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response)).into_response()
         }
     }
@@ -1177,19 +1212,24 @@ async fn compose_get_handler(
     headers: HeaderMap,
 ) -> impl IntoResponse {
     let theme = get_theme_from_headers(&headers);
-    
+
     // Check if mail sending is configured
     if state.mail_sender.is_none() {
         return ThreadErrorTemplate {
-            message: "Mail sending is not configured. Please configure msmtp in your settings.".to_string(),
+            message: "Mail sending is not configured. Please configure msmtp in your settings."
+                .to_string(),
             theme,
         }
         .into_response();
     }
-    
+
     // Get default from address (currently unused but may be displayed in UI later)
-    let _from_email = state.user_config.email.as_deref().unwrap_or("user@example.com");
-    
+    let _from_email = state
+        .user_config
+        .email
+        .as_deref()
+        .unwrap_or("user@example.com");
+
     ComposeTemplate {
         title: "Compose New Email".to_string(),
         action_url: "/compose".to_string(),
@@ -1199,7 +1239,10 @@ async fn compose_get_handler(
         cc: "".to_string(),
         bcc: "".to_string(),
         subject: "".to_string(),
-        body: format!("\n\n--\n{}", state.user_config.signature.as_deref().unwrap_or("")),
+        body: format!(
+            "\n\n--\n{}",
+            state.user_config.signature.as_deref().unwrap_or("")
+        ),
         in_reply_to: "".to_string(),
         references: "".to_string(),
         original_message_id: "".to_string(),
@@ -1215,7 +1258,7 @@ async fn compose_post_handler(
     Form(form_data): Form<ComposeFormData>,
 ) -> impl IntoResponse {
     let theme = get_theme_from_headers(&headers);
-    
+
     // Check if mail sending is configured
     let mail_sender = match &state.mail_sender {
         Some(sender) => sender,
@@ -1227,37 +1270,37 @@ async fn compose_post_handler(
             .into_response();
         }
     };
-    
+
     // Build the message
     let mut builder = MessageBuilder::new()
         .to(form_data.to.clone())
         .subject(form_data.subject.clone())
         .body(form_data.body.clone());
-    
+
     // Add optional fields
     if let Some(from_email) = &state.user_config.email {
         builder = builder.from(from_email.clone());
     }
-    
+
     if let Some(cc) = form_data.cc.as_ref() {
         if !cc.is_empty() {
             builder = builder.cc(cc.clone());
         }
     }
-    
+
     if let Some(bcc) = form_data.bcc.as_ref() {
         if !bcc.is_empty() {
             builder = builder.bcc(bcc.clone());
         }
     }
-    
+
     // Set reply headers if present
     if let Some(in_reply_to) = form_data.in_reply_to.as_ref() {
         if !in_reply_to.is_empty() {
             builder = builder.in_reply_to(in_reply_to.clone());
         }
     }
-    
+
     if let Some(references) = form_data.references.as_ref() {
         if !references.is_empty() {
             // Split references and add each one
@@ -1266,7 +1309,7 @@ async fn compose_post_handler(
             }
         }
     }
-    
+
     // Build and send the message
     match builder.build() {
         Ok(message) => {
@@ -1335,25 +1378,26 @@ async fn reply_get_handler(
     headers: HeaderMap,
 ) -> impl IntoResponse {
     let theme = get_theme_from_headers(&headers);
-    
+
     // Check if mail sending is configured
     if state.mail_sender.is_none() {
         return ThreadErrorTemplate {
-            message: "Mail sending is not configured. Please configure msmtp in your settings.".to_string(),
+            message: "Mail sending is not configured. Please configure msmtp in your settings."
+                .to_string(),
             theme,
         }
         .into_response();
     }
-    
+
     // Fetch the thread
     match state.client.show(&format!("thread:{}", thread_id)).await {
         Ok(thread) => {
             let messages = thread.get_messages();
-            
+
             // Get the specific message to reply to
             if let Some(original_message) = messages.get(params.message) {
                 let reply_all = params.all.unwrap_or(false);
-                
+
                 // Determine recipients
                 // If replying to own message, use original recipients instead of sender
                 let to = if let Some(user_email) = &state.user_config.email {
@@ -1362,46 +1406,65 @@ async fn reply_get_handler(
                         original_message.headers.to.clone()
                     } else {
                         // Normal reply - use original sender
-                        original_message.headers.from.clone()
+                        Some(original_message.headers.from.clone())
                     }
                 } else {
                     // No user email configured, use original sender
-                    original_message.headers.from.clone()
+                    Some(original_message.headers.from.clone())
                 };
                 let mut cc = String::new();
-                
+
                 if reply_all {
                     // Add original To recipients to CC
-                    cc = original_message.headers.to.clone();
-                    
+                    cc = original_message.headers.to.clone().unwrap_or_default();
+
                     // CC field is not available in headers, skip for now
                     // TODO: Parse CC from raw message headers if needed
-                    
+
                     // Remove self from CC if present
                     if let Some(user_email) = &state.user_config.email {
-                        cc = cc.split(',')
+                        cc = cc
+                            .split(',')
                             .map(|s| s.trim())
                             .filter(|email| !email.contains(user_email))
                             .collect::<Vec<_>>()
                             .join(", ");
                     }
                 }
-                
+
                 // Prepare subject with Re: prefix if not already present
-                let subject = if original_message.headers.subject.starts_with("Re: ") {
-                    original_message.headers.subject.clone()
+                let subject = if original_message
+                    .headers
+                    .subject
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("Re: ")
+                {
+                    original_message
+                        .headers
+                        .subject
+                        .clone()
+                        .unwrap_or("(No subject)".to_string())
                 } else {
-                    format!("Re: {}", original_message.headers.subject)
+                    format!(
+                        "Re: {}",
+                        original_message
+                            .headers
+                            .subject
+                            .as_deref()
+                            .unwrap_or("(No subject)")
+                    )
                 };
-                
+
                 // Build reply body with quoted original
-                let quoted_body = original_message.get_text_content()
+                let quoted_body = original_message
+                    .get_text_content()
                     .unwrap_or_default()
                     .lines()
                     .map(|line| format!("> {}", line))
                     .collect::<Vec<_>>()
                     .join("\n");
-                
+
                 let body = format!(
                     "\n\nOn {}, {} wrote:\n{}\n\n--\n{}",
                     original_message.date_relative,
@@ -1409,10 +1472,13 @@ async fn reply_get_handler(
                     quoted_body,
                     state.user_config.signature.as_deref().unwrap_or("")
                 );
-                
+
                 // Extract message ID for In-Reply-To
                 // Try multiple sources for the Message-ID
-                let in_reply_to = original_message.headers.additional.get("message-id")
+                let in_reply_to = original_message
+                    .headers
+                    .additional
+                    .get("message-id")
                     .or_else(|| original_message.headers.additional.get("Message-Id"))
                     .or_else(|| original_message.headers.additional.get("Message-ID"))
                     .cloned()
@@ -1425,7 +1491,7 @@ async fn reply_get_handler(
                             format!("<{}@{}>", original_message.id, "notmuch.local")
                         }
                     });
-                
+
                 // Build references chain
                 let mut references = Vec::new();
                 if let Some(orig_refs) = original_message.headers.additional.get("references") {
@@ -1433,19 +1499,26 @@ async fn reply_get_handler(
                 }
                 references.push(in_reply_to.clone());
                 let references_str = references.join(" ");
-                
+
                 let title = if reply_all {
                     "Reply All".to_string()
                 } else {
                     "Reply".to_string()
                 };
-                
+
                 ComposeTemplate {
                     title,
-                    action_url: format!("/thread/{}/reply?message={}&all={}", thread_id, params.message, reply_all),
+                    action_url: format!(
+                        "/thread/{}/reply?message={}&all={}",
+                        thread_id, params.message, reply_all
+                    ),
                     back_url: format!("/thread/{}", thread_id),
-                    mode: if reply_all { "reply_all".to_string() } else { "reply".to_string() },
-                    to,
+                    mode: if reply_all {
+                        "reply_all".to_string()
+                    } else {
+                        "reply".to_string()
+                    },
+                    to: to.unwrap_or_default(),
                     cc,
                     bcc: "".to_string(),
                     subject,
@@ -1484,7 +1557,7 @@ async fn reply_post_handler(
     Form(form_data): Form<ComposeFormData>,
 ) -> impl IntoResponse {
     let theme = get_theme_from_headers(&headers);
-    
+
     // Check if mail sending is configured
     let mail_sender = match &state.mail_sender {
         Some(sender) => sender,
@@ -1496,37 +1569,37 @@ async fn reply_post_handler(
             .into_response();
         }
     };
-    
+
     // Build the reply message
     let mut builder = MessageBuilder::new()
         .to(form_data.to.clone())
         .subject(form_data.subject.clone())
         .body(form_data.body.clone());
-    
+
     // Add optional fields
     if let Some(from_email) = &state.user_config.email {
         builder = builder.from(from_email.clone());
     }
-    
+
     if let Some(cc) = form_data.cc.as_ref() {
         if !cc.is_empty() {
             builder = builder.cc(cc.clone());
         }
     }
-    
+
     if let Some(bcc) = form_data.bcc.as_ref() {
         if !bcc.is_empty() {
             builder = builder.bcc(bcc.clone());
         }
     }
-    
+
     // Set reply headers
     if let Some(in_reply_to) = form_data.in_reply_to.as_ref() {
         if !in_reply_to.is_empty() {
             builder = builder.in_reply_to(in_reply_to.clone());
         }
     }
-    
+
     if let Some(references) = form_data.references.as_ref() {
         if !references.is_empty() {
             // Split references and add each one
@@ -1535,7 +1608,7 @@ async fn reply_post_handler(
             }
         }
     }
-    
+
     // Build and send the message
     match builder.build() {
         Ok(message) => {
@@ -1549,10 +1622,21 @@ async fn reply_post_handler(
                     tracing::error!("Failed to send reply: {}", e);
                     let reply_all = params.all.unwrap_or(false);
                     ComposeTemplate {
-                        title: if reply_all { "Reply All".to_string() } else { "Reply".to_string() },
-                        action_url: format!("/thread/{}/reply?message={}&all={}", thread_id, params.message, reply_all),
+                        title: if reply_all {
+                            "Reply All".to_string()
+                        } else {
+                            "Reply".to_string()
+                        },
+                        action_url: format!(
+                            "/thread/{}/reply?message={}&all={}",
+                            thread_id, params.message, reply_all
+                        ),
                         back_url: format!("/thread/{}", thread_id),
-                        mode: if reply_all { "reply_all".to_string() } else { "reply".to_string() },
+                        mode: if reply_all {
+                            "reply_all".to_string()
+                        } else {
+                            "reply".to_string()
+                        },
                         to: form_data.to,
                         cc: form_data.cc.unwrap_or_default(),
                         bcc: form_data.bcc.unwrap_or_default(),
@@ -1572,10 +1656,21 @@ async fn reply_post_handler(
             tracing::error!("Failed to build reply: {}", e);
             let reply_all = params.all.unwrap_or(false);
             ComposeTemplate {
-                title: if reply_all { "Reply All".to_string() } else { "Reply".to_string() },
-                action_url: format!("/thread/{}/reply?message={}&all={}", thread_id, params.message, reply_all),
+                title: if reply_all {
+                    "Reply All".to_string()
+                } else {
+                    "Reply".to_string()
+                },
+                action_url: format!(
+                    "/thread/{}/reply?message={}&all={}",
+                    thread_id, params.message, reply_all
+                ),
                 back_url: format!("/thread/{}", thread_id),
-                mode: if reply_all { "reply_all".to_string() } else { "reply".to_string() },
+                mode: if reply_all {
+                    "reply_all".to_string()
+                } else {
+                    "reply".to_string()
+                },
                 to: form_data.to,
                 cc: form_data.cc.unwrap_or_default(),
                 bcc: form_data.bcc.unwrap_or_default(),
@@ -1604,47 +1699,74 @@ async fn forward_get_handler(
     headers: HeaderMap,
 ) -> impl IntoResponse {
     let theme = get_theme_from_headers(&headers);
-    
+
     // Check if mail sending is configured
     if state.mail_sender.is_none() {
         return ThreadErrorTemplate {
-            message: "Mail sending is not configured. Please configure msmtp in your settings.".to_string(),
+            message: "Mail sending is not configured. Please configure msmtp in your settings."
+                .to_string(),
             theme,
         }
         .into_response();
     }
-    
+
     // Fetch the thread
     match state.client.show(&format!("thread:{}", thread_id)).await {
         Ok(thread) => {
             let messages = thread.get_messages();
-            
+
             // Get the specific message to forward
             if let Some(original_message) = messages.get(params.message) {
                 // Prepare subject with Fwd: prefix if not already present
-                let subject = if original_message.headers.subject.starts_with("Fwd: ") {
-                    original_message.headers.subject.clone()
+                let subject = if original_message
+                    .headers
+                    .subject
+                    .as_deref()
+                    .unwrap_or("")
+                    .starts_with("Fwd: ")
+                {
+                    original_message
+                        .headers
+                        .subject
+                        .clone()
+                        .unwrap_or("(No subject)".to_string())
                 } else {
-                    format!("Fwd: {}", original_message.headers.subject)
+                    format!(
+                        "Fwd: {}",
+                        original_message
+                            .headers
+                            .subject
+                            .as_deref()
+                            .unwrap_or("(No subject)")
+                    )
                 };
-                
+
                 // Build forward body with original message
-                let original_text = original_message.get_text_content()
+                let original_text = original_message
+                    .get_text_content()
                     .unwrap_or("[No text content]");
-                
+
                 let body = format!(
                     "\n\n---------- Forwarded message ----------\nFrom: {}\nDate: {}\nSubject: {}\nTo: {}\n\n{}\n\n--\n{}",
                     original_message.headers.from,
                     original_message.date_relative,
-                    original_message.headers.subject,
-                    original_message.headers.to,
+                    original_message
+                        .headers
+                        .subject
+                        .as_deref()
+                        .unwrap_or("(No subject)"),
+                    original_message
+                        .headers
+                        .to
+                        .as_deref()
+                        .unwrap_or("Undisclosed recipients"),
                     original_text,
                     state.user_config.signature.as_deref().unwrap_or("")
                 );
-                
+
                 // Store original message ID for attachment forwarding (future feature)
                 let original_message_id = original_message.id.clone();
-                
+
                 ComposeTemplate {
                     title: "Forward Email".to_string(),
                     action_url: format!("/thread/{}/forward?message={}", thread_id, params.message),
@@ -1689,7 +1811,7 @@ async fn forward_post_handler(
     Form(form_data): Form<ComposeFormData>,
 ) -> impl IntoResponse {
     let theme = get_theme_from_headers(&headers);
-    
+
     // Check if mail sending is configured
     let mail_sender = match &state.mail_sender {
         Some(sender) => sender,
@@ -1701,30 +1823,30 @@ async fn forward_post_handler(
             .into_response();
         }
     };
-    
+
     // Build the forward message
     let mut builder = MessageBuilder::new()
         .to(form_data.to.clone())
         .subject(form_data.subject.clone())
         .body(form_data.body.clone());
-    
+
     // Add optional fields
     if let Some(from_email) = &state.user_config.email {
         builder = builder.from(from_email.clone());
     }
-    
+
     if let Some(cc) = form_data.cc.as_ref() {
         if !cc.is_empty() {
             builder = builder.cc(cc.clone());
         }
     }
-    
+
     if let Some(bcc) = form_data.bcc.as_ref() {
         if !bcc.is_empty() {
             builder = builder.bcc(bcc.clone());
         }
     }
-    
+
     // Build and send the message
     match builder.build() {
         Ok(message) => {
@@ -1738,7 +1860,10 @@ async fn forward_post_handler(
                     tracing::error!("Failed to forward email: {}", e);
                     ComposeTemplate {
                         title: "Forward Email".to_string(),
-                        action_url: format!("/thread/{}/forward?message={}", thread_id, params.message),
+                        action_url: format!(
+                            "/thread/{}/forward?message={}",
+                            thread_id, params.message
+                        ),
                         back_url: format!("/thread/{}", thread_id),
                         mode: "forward".to_string(),
                         to: form_data.to,

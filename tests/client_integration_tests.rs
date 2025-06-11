@@ -85,8 +85,14 @@ async fn test_show_thread() {
     let messages = thread.get_messages();
 
     assert_eq!(messages.len(), 4); // Original + 3 replies
-    assert_eq!(messages[0].headers.subject, "Discussion Thread");
-    assert_eq!(messages[1].headers.subject, "Re: Discussion Thread");
+    assert_eq!(
+        messages[0].headers.subject,
+        Some("Discussion Thread".to_string())
+    );
+    assert_eq!(
+        messages[1].headers.subject,
+        Some("Re: Discussion Thread".to_string())
+    );
 }
 
 #[tokio::test]
@@ -540,7 +546,10 @@ async fn test_message_content_retrieval() {
     assert_eq!(messages.len(), 1);
 
     let message = &messages[0];
-    assert_eq!(message.headers.subject, "Plain Text Email");
+    assert_eq!(
+        message.headers.subject,
+        Some("Plain Text Email".to_string())
+    );
 
     // Check that body parts exist
     assert!(!message.body.is_empty(), "Message should have body parts");

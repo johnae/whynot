@@ -49,7 +49,11 @@ async fn test_refresh_query_endpoint_exists() {
         .unwrap();
 
     // Endpoint should exist and return a response (not 404)
-    assert_ne!(response.status(), 404, "The /api/refresh-query endpoint should exist");
+    assert_ne!(
+        response.status(),
+        404,
+        "The /api/refresh-query endpoint should exist"
+    );
 }
 
 #[tokio::test]
@@ -84,7 +88,7 @@ async fn test_refresh_query_accepts_query_parameter() {
         .unwrap();
 
     assert_eq!(response.status(), 200);
-    
+
     let body: serde_json::Value = response.json().await.unwrap();
     assert!(body.get("messages").is_some());
 }
@@ -102,13 +106,13 @@ async fn test_refresh_query_response_structure() {
         .unwrap();
 
     assert_eq!(response.status(), 200);
-    
+
     let body: serde_json::Value = response.json().await.unwrap();
-    
+
     // Should contain messages array
     assert!(body.get("messages").is_some());
     assert!(body["messages"].is_array());
-    
+
     // Should contain timestamp for caching/comparison
     assert!(body.get("timestamp").is_some());
 }
@@ -174,13 +178,13 @@ async fn test_refresh_query_returns_current_messages() {
         .unwrap();
 
     assert_eq!(response.status(), 200);
-    
+
     let body: serde_json::Value = response.json().await.unwrap();
     let messages = body["messages"].as_array().unwrap();
-    
+
     // Should contain both messages
     assert_eq!(messages.len(), 2);
-    
+
     // Should contain message subjects in the response
     let response_text = serde_json::to_string(&body).unwrap();
     assert!(response_text.contains("First message"));
@@ -204,10 +208,10 @@ async fn test_inbox_contains_auto_refresh_javascript() {
 
     // Should contain JavaScript for auto-refresh
     assert!(body.contains("auto-refresh") || body.contains("autoRefresh"));
-    
+
     // Should contain polling interval configuration
     assert!(body.contains("30000") || body.contains("setInterval"));
-    
+
     // Should contain refresh function
     assert!(body.contains("refreshQuery") || body.contains("refresh"));
 }
@@ -229,10 +233,10 @@ async fn test_search_page_contains_auto_refresh_javascript() {
 
     // Should contain JavaScript for auto-refresh
     assert!(body.contains("auto-refresh") || body.contains("autoRefresh"));
-    
+
     // Should contain polling interval configuration
     assert!(body.contains("30000") || body.contains("setInterval"));
-    
+
     // Should contain refresh function
     assert!(body.contains("refreshQuery") || body.contains("refresh"));
 }
@@ -245,14 +249,17 @@ async fn test_refresh_query_handles_invalid_query() {
 
     // Test with malformed query
     let response = client
-        .get(format!("http://{}/api/refresh-query?q=invalid:query:syntax", addr))
+        .get(format!(
+            "http://{}/api/refresh-query?q=invalid:query:syntax",
+            addr
+        ))
         .send()
         .await
         .unwrap();
 
     // Should handle gracefully, not crash
     assert!(response.status().is_success() || response.status().is_client_error());
-    
+
     if response.status().is_success() {
         let body: serde_json::Value = response.json().await.unwrap();
         assert!(body.get("messages").is_some());
@@ -274,7 +281,7 @@ async fn test_refresh_query_default_query() {
         .unwrap();
 
     assert_eq!(response.status(), 200);
-    
+
     let body: serde_json::Value = response.json().await.unwrap();
     assert!(body.get("messages").is_some());
     assert!(body["messages"].is_array());
@@ -336,32 +343,44 @@ async fn test_refresh_query_preserves_thread_ids() {
         .unwrap();
 
     assert_eq!(response.status(), 200);
-    
+
     let body: serde_json::Value = response.json().await.unwrap();
     let messages = body["messages"].as_array().unwrap();
-    
+
     // Should have our test message
     assert_eq!(messages.len(), 1);
-    
+
     let message = &messages[0];
-    
+
     // Critical test: thread field must be present and non-empty
-    assert!(message.get("thread").is_some(), "Message should have 'thread' field");
+    assert!(
+        message.get("thread").is_some(),
+        "Message should have 'thread' field"
+    );
     let thread_id = message["thread"].as_str().unwrap();
     assert!(!thread_id.is_empty(), "Thread ID should not be empty");
-    assert!(thread_id.len() > 5, "Thread ID should be a valid notmuch thread ID");
-    
+    assert!(
+        thread_id.len() > 5,
+        "Thread ID should be a valid notmuch thread ID"
+    );
+
     // Verify other essential fields for building links
-    assert!(message.get("subject").is_some(), "Message should have 'subject' field");
-    assert!(message.get("authors").is_some(), "Message should have 'authors' field");
+    assert!(
+        message.get("subject").is_some(),
+        "Message should have 'subject' field"
+    );
+    assert!(
+        message.get("authors").is_some(),
+        "Message should have 'authors' field"
+    );
 }
 
 #[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_auto_refresh_javascript_generates_correct_thread_links() {
+    use scraper::{Html, Selector};
     use whynot::test_utils::mbox::{EmailMessage, MboxBuilder};
     use whynot::test_utils::notmuch::TestNotmuch;
-    use scraper::{Html, Selector};
 
     let test_notmuch = TestNotmuch::new().await.unwrap();
 
@@ -415,30 +434,44 @@ async fn test_auto_refresh_javascript_generates_correct_thread_links() {
 
     assert_eq!(initial_response.status(), 200);
     let initial_html = initial_response.text().await.unwrap();
-    
+
     // Parse the HTML and check that thread links are present
     let document = Html::parse_document(&initial_html);
     let link_selector = Selector::parse("a[href*='/thread/']").unwrap();
     let links: Vec<_> = document.select(&link_selector).collect();
-    
+
     // We should have at least one thread link in the initial render
-    assert!(!links.is_empty(), "Initial page should contain thread links");
-    
+    assert!(
+        !links.is_empty(),
+        "Initial page should contain thread links"
+    );
+
     // Get the href of the first link to compare later
     let initial_href = links[0].value().attr("href").unwrap();
-    assert!(initial_href.starts_with("/thread/"), "Link should start with /thread/");
-    assert!(initial_href.len() > "/thread/".len(), "Thread ID should not be empty in link");
-    
+    assert!(
+        initial_href.starts_with("/thread/"),
+        "Link should start with /thread/"
+    );
+    assert!(
+        initial_href.len() > "/thread/".len(),
+        "Thread ID should not be empty in link"
+    );
+
     // Check that the JavaScript contains the problematic code that needs fixing
-    assert!(initial_html.contains("updateMessageList"), "Page should contain updateMessageList function");
-    
+    assert!(
+        initial_html.contains("updateMessageList"),
+        "Page should contain updateMessageList function"
+    );
+
     // This is the specific bug we're testing for:
     // The JavaScript likely uses message.thread_id instead of message.thread
     if initial_html.contains("message.thread_id") {
         // This would be the bug - JavaScript trying to access thread_id property
-        panic!("JavaScript contains 'message.thread_id' which would cause broken links after refresh");
+        panic!(
+            "JavaScript contains 'message.thread_id' which would cause broken links after refresh"
+        );
     }
-    
+
     // Now test what happens after an auto-refresh
     let refresh_response = client
         .get(format!("http://{}/api/refresh-query?q=*", addr))
@@ -449,17 +482,22 @@ async fn test_auto_refresh_javascript_generates_correct_thread_links() {
     assert_eq!(refresh_response.status(), 200);
     let refresh_data: serde_json::Value = refresh_response.json().await.unwrap();
     let messages = refresh_data["messages"].as_array().unwrap();
-    
+
     // Verify the API response has the correct structure for JavaScript to use
     assert_eq!(messages.len(), 1);
     let message = &messages[0];
-    
+
     // The critical issue: JavaScript needs to access the 'thread' field, not 'thread_id'
-    assert!(message.get("thread").is_some(), "API should return 'thread' field");
+    assert!(
+        message.get("thread").is_some(),
+        "API should return 'thread' field"
+    );
     let thread_id = message["thread"].as_str().unwrap();
-    
+
     // Verify this is the same thread ID as in the initial page
     let expected_thread_path = format!("/thread/{}", thread_id);
-    assert_eq!(initial_href, expected_thread_path, 
-        "Thread ID from API should match the one in initial page links");
+    assert_eq!(
+        initial_href, expected_thread_path,
+        "Thread ID from API should match the one in initial page links"
+    );
 }
