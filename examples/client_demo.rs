@@ -6,7 +6,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Local Client Example ===");
     let local_config = ClientConfig::local();
     let local_client = create_client(local_config)?;
-    
+
     // Search for messages
     match local_client.search("date:today..").await {
         Ok(results) => {
@@ -16,12 +16,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Err(e) => {
-            println!("Local search failed (this is expected if notmuch is not configured): {}", e);
+            println!(
+                "Local search failed (this is expected if notmuch is not configured): {}",
+                e
+            );
         }
     }
-    
+
     println!();
-    
+
     // Example 2: Create a remote client
     println!("=== Remote Client Example ===");
     println!("To use the remote client, configure it with your server details:");
@@ -40,11 +43,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("    \"/home/user/.ssh/id_rsa\".into()");
     println!(");");
     println!();
-    
+
     // Demonstrate remote client creation (won't actually connect)
     let remote_config = ClientConfig::remote("example.com".to_string());
     let _remote_client = create_client(remote_config)?;
     println!("Remote client created successfully (no connection attempted)");
-    
+
     Ok(())
 }
