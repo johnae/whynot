@@ -149,6 +149,22 @@ impl Event {
         )
     }
 
+    /// Check if this is a reply-all key (R or Shift+r)
+    pub fn is_reply_all(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('R'),
+                modifiers: KeyModifiers::NONE,
+                ..
+            }) | Event::Key(KeyEvent {
+                code: KeyCode::Char('r'),
+                modifiers: KeyModifiers::SHIFT,
+                ..
+            })
+        )
+    }
+
     /// Check if this is a forward key (f)
     pub fn is_forward(&self) -> bool {
         matches!(
@@ -156,6 +172,42 @@ impl Event {
             Event::Key(KeyEvent {
                 code: KeyCode::Char('f'),
                 modifiers: KeyModifiers::NONE,
+                ..
+            })
+        )
+    }
+
+    /// Check if this is a tab key (for field navigation)
+    pub fn is_tab(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                code: KeyCode::Tab,
+                modifiers: KeyModifiers::NONE,
+                ..
+            })
+        )
+    }
+
+    /// Check if this is a shift+tab key (for reverse field navigation)
+    pub fn is_shift_tab(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                code: KeyCode::BackTab,
+                modifiers: KeyModifiers::SHIFT,
+                ..
+            })
+        )
+    }
+
+    /// Check if this is a send key (Ctrl+S)
+    pub fn is_send(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('s'),
+                modifiers: KeyModifiers::CONTROL,
                 ..
             })
         )

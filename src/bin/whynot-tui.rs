@@ -8,6 +8,7 @@ use std::{io, sync::Arc, time::Duration};
 use whynot::{
     client::create_client,
     config::{Config, CliArgs},
+    mail_sender::create_mail_sender,
     tui::{app::App, events::EventHandler, ui},
 };
 
@@ -24,6 +25,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = create_client(client_config)?;
     let client = Arc::from(client) as Arc<dyn whynot::client::NotmuchClient>;
     
+    // Create the mail sender (optional if not configured)
+    let mail_sender = match config.to_mail_sender_config() {
+        Ok(mail_sender_config) => {
+            match create_mail_sender(mail_sender_config) {
+                Ok(sender) => Some(sender),
+                Err(e) => {
+                    eprintln!("Warning: Mail sending not configured: {}", e);
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("Warning: Mail sending configuration incomplete: {}", e);
+            None
+        }
+    };
+    
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -32,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     // Create app and event handler
-    let mut app = App::new(client).await?;
+    let mut app = App::new(client, mail_sender).await?;
     let event_handler = EventHandler::new(Duration::from_millis(250));
 
     // Initialize the app
@@ -86,6 +104,8 @@ async fn run_app<B: ratatui::backend::Backend>(
                             }
                         } else if event.is_search() {
                             app.enter_search_mode();
+                        } else if event.is_compose() {
+                            app.start_compose_new();
                         } else if event.is_help() {
                             app.show_help();
                         }
@@ -93,6 +113,12 @@ async fn run_app<B: ratatui::backend::Backend>(
                     whynot::tui::app::AppState::EmailView => {
                         if event.is_back() {
                             app.go_back();
+                        } else if event.is_reply() {
+                            app.start_compose_reply(false);
+                        } else if event.is_reply_all() {
+                            app.start_compose_reply(true);
+                        } else if event.is_forward() {
+                            app.start_compose_forward();
                         } else if event.is_help() {
                             app.show_help();
                         }
@@ -123,10 +149,29 @@ async fn run_app<B: ratatui::backend::Backend>(
                         }
                     }
                     whynot::tui::app::AppState::Compose => {
-                        if event.is_back() {
-                            app.go_back();
+                        match key.code {
+                            crossterm::event::KeyCode::Esc => {
+                                app.go_back();
+                            }
+                            crossterm::event::KeyCode::Tab => {
+                                app.compose_next_field();
+                            }
+                            crossterm::event::KeyCode::BackTab => {
+                                app.compose_prev_field();
+                            }
+                            crossterm::event::KeyCode::Char('s') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                                if let Err(e) = app.send_composed_email().await {
+                                    app.set_status(format!("Send error: {}", e));
+                                }
+                            }
+                            crossterm::event::KeyCode::Backspace => {
+                                app.compose_handle_backspace();
+                            }
+                            crossterm::event::KeyCode::Char(c) => {
+                                app.compose_handle_char(c);
+                            }
+                            _ => {}
                         }
-                        // TODO: Handle compose input
                     }
                 }
             }

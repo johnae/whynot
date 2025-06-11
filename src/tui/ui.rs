@@ -176,9 +176,10 @@ fn draw_help(f: &mut Frame, _app: &mut App, area: Rect) {
         Line::from(""),
         Line::from("Actions:"),
         Line::from("  /       - Search"),
-        Line::from("  c       - Compose"),
-        Line::from("  r       - Reply"),
-        Line::from("  f       - Forward"),
+        Line::from("  c       - Compose (from email list)"),
+        Line::from("  r       - Reply (from email view)"),
+        Line::from("  R       - Reply all (from email view)"),
+        Line::from("  f       - Forward (from email view)"),
         Line::from("  ?       - Show this help"),
         Line::from("  q       - Quit"),
         Line::from(""),
@@ -195,10 +196,95 @@ fn draw_help(f: &mut Frame, _app: &mut App, area: Rect) {
     f.render_widget(paragraph, popup_area);
 }
 
-fn draw_compose(f: &mut Frame, _app: &mut App, area: Rect) {
-    let paragraph = Paragraph::new("Compose mode - Not yet implemented")
-        .block(Block::default().borders(Borders::ALL).title("Compose"));
-    f.render_widget(paragraph, area);
+fn draw_compose(f: &mut Frame, app: &mut App, area: Rect) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // To field
+            Constraint::Length(3), // Cc field  
+            Constraint::Length(3), // Bcc field
+            Constraint::Length(3), // Subject field
+            Constraint::Min(1),    // Body field
+            Constraint::Length(1), // Instructions
+        ])
+        .split(area);
+
+    // Helper function to create field style based on whether it's selected
+    let field_style = |field: &crate::tui::app::ComposeField| -> Style {
+        if std::mem::discriminant(field) == std::mem::discriminant(&app.compose_form.current_field) {
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+        }
+    };
+
+    // To field
+    let to_paragraph = Paragraph::new(format!("To: {}_", app.compose_form.to))
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title("To")
+            .border_style(field_style(&crate::tui::app::ComposeField::To))
+        )
+        .wrap(Wrap { trim: false });
+    f.render_widget(to_paragraph, chunks[0]);
+
+    // Cc field
+    let cc_paragraph = Paragraph::new(format!("Cc: {}_", app.compose_form.cc))
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title("Cc")
+            .border_style(field_style(&crate::tui::app::ComposeField::Cc))
+        )
+        .wrap(Wrap { trim: false });
+    f.render_widget(cc_paragraph, chunks[1]);
+
+    // Bcc field
+    let bcc_paragraph = Paragraph::new(format!("Bcc: {}_", app.compose_form.bcc))
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title("Bcc")
+            .border_style(field_style(&crate::tui::app::ComposeField::Bcc))
+        )
+        .wrap(Wrap { trim: false });
+    f.render_widget(bcc_paragraph, chunks[2]);
+
+    // Subject field
+    let subject_paragraph = Paragraph::new(format!("Subject: {}_", app.compose_form.subject))
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title("Subject")
+            .border_style(field_style(&crate::tui::app::ComposeField::Subject))
+        )
+        .wrap(Wrap { trim: false });
+    f.render_widget(subject_paragraph, chunks[3]);
+
+    // Body field
+    let body_text = if matches!(app.compose_form.current_field, crate::tui::app::ComposeField::Body) {
+        format!("{}_", app.compose_form.body)
+    } else {
+        app.compose_form.body.clone()
+    };
+    
+    let body_paragraph = Paragraph::new(body_text)
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title("Body")
+            .border_style(field_style(&crate::tui::app::ComposeField::Body))
+        )
+        .wrap(Wrap { trim: true });
+    f.render_widget(body_paragraph, chunks[4]);
+
+    // Instructions
+    let instructions = match app.compose_form.mode {
+        crate::tui::app::ComposeMode::New => "New Email - Tab/Shift+Tab: switch fields, Ctrl+S: send, Esc: cancel",
+        crate::tui::app::ComposeMode::Reply(_) => "Reply - Tab/Shift+Tab: switch fields, Ctrl+S: send, Esc: cancel",
+        crate::tui::app::ComposeMode::ReplyAll(_) => "Reply All - Tab/Shift+Tab: switch fields, Ctrl+S: send, Esc: cancel",
+        crate::tui::app::ComposeMode::Forward(_) => "Forward - Tab/Shift+Tab: switch fields, Ctrl+S: send, Esc: cancel",
+    };
+    
+    let instructions_paragraph = Paragraph::new(instructions)
+        .style(Style::default().fg(Color::Gray));
+    f.render_widget(instructions_paragraph, chunks[5]);
 }
 
 fn draw_status_bar(f: &mut Frame, app: &mut App, area: Rect) {
