@@ -113,6 +113,125 @@ impl BuiltinConverter {
             "lsquo" => Some("\u{2018}".to_string()), // Left single quotation mark
             "rsquo" => Some("\u{2019}".to_string()), // Right single quotation mark
 
+            // Zero-width and formatting characters
+            "shy" => Some("\u{00AD}".to_string()),     // Soft hyphen
+            "zwnj" => Some("\u{200C}".to_string()),    // Zero width non-joiner
+            "zwj" => Some("\u{200D}".to_string()),     // Zero width joiner
+
+            // Spaces
+            "thinsp" => Some("\u{2009}".to_string()),  // Thin space
+            "ensp" => Some("\u{2002}".to_string()),    // En space
+            "emsp" => Some("\u{2003}".to_string()),    // Em space
+
+            // Mathematical symbols
+            "times" => Some("×".to_string()),          // Multiplication sign
+            "divide" => Some("÷".to_string()),         // Division sign
+            "plusmn" => Some("±".to_string()),         // Plus minus
+            "deg" => Some("°".to_string()),            // Degree symbol
+
+            // Currency symbols
+            "euro" => Some("€".to_string()),           // Euro symbol
+            "pound" => Some("£".to_string()),          // Pound symbol
+            "yen" => Some("¥".to_string()),            // Yen symbol
+            "cent" => Some("¢".to_string()),           // Cent symbol
+
+            // Fractions
+            "frac12" => Some("½".to_string()),         // One half
+            "frac14" => Some("¼".to_string()),         // One quarter
+            "frac34" => Some("¾".to_string()),         // Three quarters
+
+            // Additional common entities
+            "sup1" => Some("¹".to_string()),           // Superscript 1
+            "sup2" => Some("²".to_string()),           // Superscript 2
+            "sup3" => Some("³".to_string()),           // Superscript 3
+            "ordm" => Some("º".to_string()),           // Masculine ordinal
+            "ordf" => Some("ª".to_string()),           // Feminine ordinal
+            "sect" => Some("§".to_string()),           // Section sign
+            "para" => Some("¶".to_string()),           // Pilcrow sign
+            "micro" => Some("µ".to_string()),          // Micro sign
+            "middot" => Some("·".to_string()),         // Middle dot
+            "cedil" => Some("¸".to_string()),          // Cedilla
+            "acute" => Some("´".to_string()),          // Acute accent
+            "uml" => Some("¨".to_string()),            // Diaeresis
+            "macr" => Some("¯".to_string()),           // Macron
+            "not" => Some("¬".to_string()),            // Not sign
+            "brvbar" => Some("¦".to_string()),         // Broken bar
+            "curren" => Some("¤".to_string()),         // Currency sign
+
+            // Nordic/Scandinavian characters (Swedish, Norwegian, Danish, Finnish)
+            "Aring" => Some("Å".to_string()),          // Latin Capital Letter A with Ring Above
+            "aring" => Some("å".to_string()),          // Latin Small Letter A with Ring Above
+            "Auml" => Some("Ä".to_string()),           // Latin Capital Letter A with Diaeresis
+            "auml" => Some("ä".to_string()),           // Latin Small Letter A with Diaeresis
+            "Ouml" => Some("Ö".to_string()),           // Latin Capital Letter O with Diaeresis
+            "ouml" => Some("ö".to_string()),           // Latin Small Letter O with Diaeresis
+            "AElig" => Some("Æ".to_string()),          // Latin Capital Letter Æ
+            "aelig" => Some("æ".to_string()),          // Latin Small Letter æ
+            "Oslash" => Some("Ø".to_string()),         // Latin Capital Letter O with Stroke
+            "oslash" => Some("ø".to_string()),         // Latin Small Letter O with Stroke
+
+            // German characters
+            "Uuml" => Some("Ü".to_string()),           // Latin Capital Letter U with Diaeresis
+            "uuml" => Some("ü".to_string()),           // Latin Small Letter U with Diaeresis
+            "szlig" => Some("ß".to_string()),          // Latin Small Letter Sharp S
+
+            // French characters
+            "Agrave" => Some("À".to_string()),         // Latin Capital Letter A with Grave
+            "agrave" => Some("à".to_string()),         // Latin Small Letter A with Grave
+            "Aacute" => Some("Á".to_string()),         // Latin Capital Letter A with Acute
+            "aacute" => Some("á".to_string()),         // Latin Small Letter A with Acute
+            "Acirc" => Some("Â".to_string()),          // Latin Capital Letter A with Circumflex
+            "acirc" => Some("â".to_string()),          // Latin Small Letter A with Circumflex
+            "Atilde" => Some("Ã".to_string()),         // Latin Capital Letter A with Tilde
+            "atilde" => Some("ã".to_string()),         // Latin Small Letter A with Tilde
+            "Ccedil" => Some("Ç".to_string()),         // Latin Capital Letter C with Cedilla
+            "ccedil" => Some("ç".to_string()),         // Latin Small Letter C with Cedilla
+            "Egrave" => Some("È".to_string()),         // Latin Capital Letter E with Grave
+            "egrave" => Some("è".to_string()),         // Latin Small Letter E with Grave
+            "Eacute" => Some("É".to_string()),         // Latin Capital Letter E with Acute
+            "eacute" => Some("é".to_string()),         // Latin Small Letter E with Acute
+            "Ecirc" => Some("Ê".to_string()),          // Latin Capital Letter E with Circumflex
+            "ecirc" => Some("ê".to_string()),          // Latin Small Letter E with Circumflex
+            "Euml" => Some("Ë".to_string()),           // Latin Capital Letter E with Diaeresis
+            "euml" => Some("ë".to_string()),           // Latin Small Letter E with Diaeresis
+            "Igrave" => Some("Ì".to_string()),         // Latin Capital Letter I with Grave
+            "igrave" => Some("ì".to_string()),         // Latin Small Letter I with Grave
+            "Iacute" => Some("Í".to_string()),         // Latin Capital Letter I with Acute
+            "iacute" => Some("í".to_string()),         // Latin Small Letter I with Acute
+            "Icirc" => Some("Î".to_string()),          // Latin Capital Letter I with Circumflex
+            "icirc" => Some("î".to_string()),          // Latin Small Letter I with Circumflex
+            "Iuml" => Some("Ï".to_string()),           // Latin Capital Letter I with Diaeresis
+            "iuml" => Some("ï".to_string()),           // Latin Small Letter I with Diaeresis
+            "Ograve" => Some("Ò".to_string()),         // Latin Capital Letter O with Grave
+            "ograve" => Some("ò".to_string()),         // Latin Small Letter O with Grave
+            "Oacute" => Some("Ó".to_string()),         // Latin Capital Letter O with Acute
+            "oacute" => Some("ó".to_string()),         // Latin Small Letter O with Acute
+            "Ocirc" => Some("Ô".to_string()),          // Latin Capital Letter O with Circumflex
+            "ocirc" => Some("ô".to_string()),          // Latin Small Letter O with Circumflex
+            "Otilde" => Some("Õ".to_string()),         // Latin Capital Letter O with Tilde
+            "otilde" => Some("õ".to_string()),         // Latin Small Letter O with Tilde
+            "Ugrave" => Some("Ù".to_string()),         // Latin Capital Letter U with Grave
+            "ugrave" => Some("ù".to_string()),         // Latin Small Letter U with Grave
+            "Uacute" => Some("Ú".to_string()),         // Latin Capital Letter U with Acute
+            "uacute" => Some("ú".to_string()),         // Latin Small Letter U with Acute
+            "Ucirc" => Some("Û".to_string()),          // Latin Capital Letter U with Circumflex
+            "ucirc" => Some("û".to_string()),          // Latin Small Letter U with Circumflex
+            "Yacute" => Some("Ý".to_string()),         // Latin Capital Letter Y with Acute
+            "yacute" => Some("ý".to_string()),         // Latin Small Letter Y with Acute
+            "yuml" => Some("ÿ".to_string()),           // Latin Small Letter Y with Diaeresis
+
+            // Spanish characters
+            "Ntilde" => Some("Ñ".to_string()),         // Latin Capital Letter N with Tilde
+            "ntilde" => Some("ñ".to_string()),         // Latin Small Letter N with Tilde
+            "iquest" => Some("¿".to_string()),         // Inverted Question Mark
+            "iexcl" => Some("¡".to_string()),          // Inverted Exclamation Mark
+
+            // Icelandic characters
+            "THORN" => Some("Þ".to_string()),          // Latin Capital Letter Thorn
+            "thorn" => Some("þ".to_string()),          // Latin Small Letter Thorn
+            "ETH" => Some("Ð".to_string()),            // Latin Capital Letter Eth
+            "eth" => Some("ð".to_string()),            // Latin Small Letter Eth
+
             // Numeric entities
             _ if entity.starts_with('#') => self.decode_numeric_entity(&entity[1..]),
 
@@ -944,5 +1063,168 @@ mod tests {
         // Should not be empty
         assert!(!result.trim().is_empty());
         assert!(result.len() > 200); // Should have substantial content
+    }
+
+    #[tokio::test]
+    async fn test_comprehensive_html_entities() {
+        let converter = create_test_converter();
+
+        // Test HTML with a comprehensive set of entities
+        let html_with_entities = r#"
+        <html>
+        <body>
+            <p>Zero-width: &shy;&zwnj;&#8203;&#173;&#8204;&zwj;</p>
+            <p>Spaces: word&thinsp;thin&ensp;en&emsp;em word</p>
+            <p>Math: 5&times;3=15, 10&divide;2=5, &plusmn;1, 90&deg;</p>
+            <p>Currency: &euro;10, &pound;5, &yen;100, &cent;50</p>
+            <p>Fractions: &frac12;, &frac14;, &frac34;</p>
+            <p>Quotes: &ldquo;hello&rdquo; and &lsquo;world&rsquo;</p>
+            <p>Other: &copy;2025 &reg; &trade; &hellip;</p>
+        </body>
+        </html>
+        "#;
+
+        let result = converter.convert(html_with_entities).await.unwrap();
+
+        println!("=== COMPREHENSIVE ENTITIES TEST RESULT ===");
+        println!("{}", result);
+        println!("=== END RESULT ===");
+
+        // Verify that raw entities are not present
+        assert!(!result.contains("&shy;"));
+        assert!(!result.contains("&zwnj;"));
+        assert!(!result.contains("&zwj;"));
+        assert!(!result.contains("&thinsp;"));
+        assert!(!result.contains("&ensp;"));
+        assert!(!result.contains("&emsp;"));
+        assert!(!result.contains("&times;"));
+        assert!(!result.contains("&divide;"));
+        assert!(!result.contains("&euro;"));
+        assert!(!result.contains("&pound;"));
+        assert!(!result.contains("&yen;"));
+        assert!(!result.contains("&cent;"));
+        assert!(!result.contains("&deg;"));
+        assert!(!result.contains("&plusmn;"));
+        assert!(!result.contains("&frac12;"));
+        assert!(!result.contains("&frac14;"));
+        assert!(!result.contains("&frac34;"));
+        assert!(!result.contains("&ldquo;"));
+        assert!(!result.contains("&rdquo;"));
+        assert!(!result.contains("&lsquo;"));
+        assert!(!result.contains("&rsquo;"));
+
+        // Verify that symbols are properly converted
+        assert!(result.contains("×"));
+        assert!(result.contains("÷"));
+        assert!(result.contains("±"));
+        assert!(result.contains("°"));
+        assert!(result.contains("€"));
+        assert!(result.contains("£"));
+        assert!(result.contains("¥"));
+        assert!(result.contains("¢"));
+        assert!(result.contains("½"));
+        assert!(result.contains("¼"));
+        assert!(result.contains("¾"));
+        assert!(result.contains("\u{201C}")); // Left double quote
+        assert!(result.contains("\u{201D}")); // Right double quote
+        assert!(result.contains("\u{2018}")); // Left single quote
+        assert!(result.contains("\u{2019}")); // Right single quote
+        assert!(result.contains("©"));
+        assert!(result.contains("®"));
+        assert!(result.contains("™"));
+        assert!(result.contains("…"));
+    }
+
+    #[tokio::test]
+    async fn test_bilprovningen_zwnj_entities() {
+        let converter = create_test_converter();
+
+        // Test the specific pattern found in bilprovningen email
+        let html_with_zwnj = r#"
+        <html>
+        <body>
+            <div style="display:none;max-height:0px;overflow:hidden;">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>
+            <p>This is the main content that should be visible.</p>
+        </body>
+        </html>
+        "#;
+
+        let result = converter.convert(html_with_zwnj).await.unwrap();
+
+        println!("=== BILPROVNINGEN ZWNJ TEST RESULT ===");
+        println!("'{}'", result);
+        println!("=== END RESULT ===");
+
+        // Should not contain raw ZWNJ entities
+        assert!(!result.contains("&zwnj;"));
+        assert!(!result.contains("&nbsp;"));
+        
+        // Should contain the main content
+        assert!(result.contains("This is the main content"));
+        assert!(result.contains("should be visible"));
+    }
+
+    #[tokio::test]
+    async fn test_language_specific_entities() {
+        let converter = create_test_converter();
+
+        // Test HTML with language-specific entities including Swedish example
+        let html_with_language_entities = r#"
+        <html>
+        <body>
+            <p>Swedish: &Ouml;ppna i din webbl&auml;sare</p>
+            <p>Nordic: &Aring;rhus, Malm&ouml;, K&oslash;benhavn, &AElig;beltoft</p>
+            <p>German: M&uuml;nchen, Wei&szlig;bier, &Uuml;berraschung</p>
+            <p>French: Caf&eacute;, na&iuml;ve, cr&egrave;me br&ucirc;l&eacute;e, &ccedil;a va</p>
+            <p>Spanish: Ma&ntilde;ana, &iquest;C&oacute;mo est&aacute;s?</p>
+            <p>Icelandic: &THORN;&oacute;r, Gu&eth;r&uacute;n</p>
+        </body>
+        </html>
+        "#;
+
+        let result = converter.convert(html_with_language_entities).await.unwrap();
+
+        println!("=== LANGUAGE ENTITIES TEST RESULT ===");
+        println!("{}", result);
+        println!("=== END RESULT ===");
+
+        // Should not contain raw entities
+        assert!(!result.contains("&Ouml;"));
+        assert!(!result.contains("&auml;"));
+        assert!(!result.contains("&Aring;"));
+        assert!(!result.contains("&oslash;"));
+        assert!(!result.contains("&AElig;"));
+        assert!(!result.contains("&uuml;"));
+        assert!(!result.contains("&szlig;"));
+        assert!(!result.contains("&eacute;"));
+        assert!(!result.contains("&iuml;"));
+        assert!(!result.contains("&egrave;"));
+        assert!(!result.contains("&ucirc;"));
+        assert!(!result.contains("&ccedil;"));
+        assert!(!result.contains("&ntilde;"));
+        assert!(!result.contains("&iquest;"));
+        assert!(!result.contains("&oacute;"));
+        assert!(!result.contains("&aacute;"));
+        assert!(!result.contains("&THORN;"));
+        assert!(!result.contains("&eth;"));
+        assert!(!result.contains("&uacute;"));
+
+        // Should contain properly converted characters
+        assert!(result.contains("Öppna i din webbläsare"));  // Swedish example
+        assert!(result.contains("Århus"));                   // Danish Å
+        assert!(result.contains("Malmö"));                   // Swedish ö
+        assert!(result.contains("København"));               // Danish ø
+        assert!(result.contains("Æbeltoft"));                // Danish Æ
+        assert!(result.contains("München"));                 // German ü
+        assert!(result.contains("Weißbier"));                // German ß
+        assert!(result.contains("Überraschung"));            // German Ü
+        assert!(result.contains("Café"));                    // French é
+        assert!(result.contains("naïve"));                   // French ï
+        assert!(result.contains("crème brûlée"));            // French è, û, é
+        assert!(result.contains("ça va"));                   // French ç
+        assert!(result.contains("Mañana"));                  // Spanish ñ
+        assert!(result.contains("¿Cómo estás?"));            // Spanish ¿, ó, á, ?
+        assert!(result.contains("Þór"));                     // Icelandic Þ, ó
+        assert!(result.contains("Guðrún"));                  // Icelandic ð, ú
     }
 }
