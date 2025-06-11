@@ -379,37 +379,63 @@ impl App {
             return Some("[No body content]".to_string());
         }
 
-        // First try to find a plain text part
-        if let Some(text_part) = message
-            .body
-            .iter()
-            .find(|part| part.content_type.starts_with("text/plain"))
-        {
-            if let crate::body::BodyContent::Text(text) = &text_part.content {
-                return Some(text.clone());
-            }
-        }
-
-        // If no plain text, try to convert HTML to text
-        if let Some(html_part) = message
-            .body
-            .iter()
-            .find(|part| part.content_type.starts_with("text/html"))
-        {
-            if let crate::body::BodyContent::Text(html) = &html_part.content {
-                // Convert HTML to text using our text renderer
-                match self.html_converter.convert(html).await {
-                    Ok(converted_text) => return Some(converted_text),
-                    Err(e) => {
-                        // Fallback to showing raw HTML if conversion fails
-                        return Some(format!("[HTML conversion failed: {}]\n\n{}", e, html));
-                    }
-                }
-            }
+        // Recursively search for text content in the body parts
+        if let Some(text_content) = self.find_text_content(&message.body).await {
+            return Some(text_content);
         }
 
         // If no readable content found
         Some("[No readable content]".to_string())
+    }
+
+    /// Recursively search through body parts to find text content
+    /// Prefers plain text over HTML, and recursively searches multipart containers
+    async fn find_text_content(&self, parts: &[crate::body::BodyPart]) -> Option<String> {
+        // Use iterative approach with a stack to avoid async recursion issues
+        let mut stack: Vec<&[crate::body::BodyPart]> = vec![parts];
+
+        // First pass: look for plain text parts (depth-first search)
+        while let Some(current_parts) = stack.pop() {
+            for part in current_parts {
+                if part.content_type.starts_with("text/plain") {
+                    if let crate::body::BodyContent::Text(text) = &part.content {
+                        return Some(text.clone());
+                    }
+                }
+                // Add nested multipart containers to stack for processing
+                if let crate::body::BodyContent::Multipart(nested_parts) = &part.content {
+                    stack.push(nested_parts);
+                }
+            }
+        }
+
+        // Second pass: look for HTML parts if no plain text found
+        let mut stack: Vec<&[crate::body::BodyPart]> = vec![parts];
+        while let Some(current_parts) = stack.pop() {
+            for part in current_parts {
+                if part.content_type.starts_with("text/html") {
+                    if let crate::body::BodyContent::Text(html) = &part.content {
+                        // Convert HTML to text using our text renderer
+                        match self.html_converter.convert(html).await {
+                            Ok(converted_text) => return Some(converted_text),
+                            Err(e) => {
+                                // Fallback to showing raw HTML if conversion fails
+                                return Some(format!(
+                                    "[HTML conversion failed: {}]\n\n{}",
+                                    e, html
+                                ));
+                            }
+                        }
+                    }
+                }
+                // Add nested multipart containers to stack for processing
+                if let crate::body::BodyContent::Multipart(nested_parts) = &part.content {
+                    stack.push(nested_parts);
+                }
+            }
+        }
+
+        None
     }
 
     /// Start composing a new email
