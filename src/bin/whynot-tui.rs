@@ -159,6 +159,10 @@ async fn run_app<B: ratatui::backend::Backend>(
                             crossterm::event::KeyCode::BackTab => {
                                 app.compose_prev_field();
                             }
+                            crossterm::event::KeyCode::Enter => {
+                                // Handle Enter key in compose mode
+                                app.compose_handle_enter();
+                            }
                             crossterm::event::KeyCode::Char('s') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                                 if let Err(e) = app.send_composed_email().await {
                                     app.set_status(format!("Send error: {}", e));

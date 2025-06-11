@@ -381,6 +381,20 @@ impl App {
         }
     }
 
+    /// Handle Enter key in compose mode
+    pub fn compose_handle_enter(&mut self) {
+        match self.compose_form.current_field {
+            ComposeField::Body => {
+                // In the body field, Enter should insert a newline
+                self.compose_form.body.push('\n');
+            }
+            _ => {
+                // In other fields, Enter moves to the next field
+                self.compose_next_field();
+            }
+        }
+    }
+
     /// Handle backspace in compose mode
     pub fn compose_handle_backspace(&mut self) {
         match self.compose_form.current_field {

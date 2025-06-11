@@ -183,6 +183,12 @@ fn draw_help(f: &mut Frame, _app: &mut App, area: Rect) {
         Line::from("  ?       - Show this help"),
         Line::from("  q       - Quit"),
         Line::from(""),
+        Line::from("Compose Mode:"),
+        Line::from("  Tab/Shift+Tab - Navigate fields"),
+        Line::from("  Enter    - New line in body field"),
+        Line::from("  Ctrl+S   - Send email"),
+        Line::from("  Esc      - Cancel compose"),
+        Line::from(""),
         Line::from("Press any key to continue..."),
     ];
 
@@ -276,10 +282,10 @@ fn draw_compose(f: &mut Frame, app: &mut App, area: Rect) {
 
     // Instructions
     let instructions = match app.compose_form.mode {
-        crate::tui::app::ComposeMode::New => "New Email - Tab/Shift+Tab: switch fields, Ctrl+S: send, Esc: cancel",
-        crate::tui::app::ComposeMode::Reply(_) => "Reply - Tab/Shift+Tab: switch fields, Ctrl+S: send, Esc: cancel",
-        crate::tui::app::ComposeMode::ReplyAll(_) => "Reply All - Tab/Shift+Tab: switch fields, Ctrl+S: send, Esc: cancel",
-        crate::tui::app::ComposeMode::Forward(_) => "Forward - Tab/Shift+Tab: switch fields, Ctrl+S: send, Esc: cancel",
+        crate::tui::app::ComposeMode::New => "New Email - Tab/Shift+Tab: switch fields, Enter: newline in body, Ctrl+S: send, Esc: cancel",
+        crate::tui::app::ComposeMode::Reply(_) => "Reply - Tab/Shift+Tab: switch fields, Enter: newline in body, Ctrl+S: send, Esc: cancel",
+        crate::tui::app::ComposeMode::ReplyAll(_) => "Reply All - Tab/Shift+Tab: switch fields, Enter: newline in body, Ctrl+S: send, Esc: cancel",
+        crate::tui::app::ComposeMode::Forward(_) => "Forward - Tab/Shift+Tab: switch fields, Enter: newline in body, Ctrl+S: send, Esc: cancel",
     };
     
     let instructions_paragraph = Paragraph::new(instructions)
