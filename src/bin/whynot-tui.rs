@@ -113,6 +113,27 @@ async fn run_app<B: ratatui::backend::Backend>(
                     whynot::tui::app::AppState::EmailView => {
                         if event.is_back() {
                             app.go_back();
+                        } else if event.is_up() {
+                            app.scroll_up();
+                        } else if event.is_down() {
+                            app.scroll_down();
+                        } else if event.is_page_up() {
+                            app.page_up();
+                        } else if event.is_page_down() {
+                            app.page_down();
+                        } else if event.is_top() {
+                            app.scroll_to_top();
+                        } else if event.is_bottom() {
+                            // For now, use a reasonable estimate for content height
+                            app.scroll_to_bottom(1000);
+                        } else if event.is_next_message() {
+                            if let Err(e) = app.next_message_in_thread().await {
+                                app.set_status(format!("Error navigating to next message: {}", e));
+                            }
+                        } else if event.is_prev_message() {
+                            if let Err(e) = app.prev_message_in_thread().await {
+                                app.set_status(format!("Error navigating to previous message: {}", e));
+                            }
                         } else if event.is_reply() {
                             app.start_compose_reply(false);
                         } else if event.is_reply_all() {

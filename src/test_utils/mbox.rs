@@ -248,17 +248,16 @@ impl EmailMessage {
 
     /// Create a newsletter-style multi-column layout
     pub fn with_newsletter_layout(mut self) -> Self {
-        let html = format!(
-            r#"
+        let html = r#"
             <html>
             <head>
                 <style>
-                    .newsletter-container {{ max-width: 600px; margin: 0 auto; font-family: 'Helvetica', Arial, sans-serif; }}
-                    .header {{ background: #2c3e50; color: white; padding: 20px; text-align: center; }}
-                    .two-column {{ display: flex; gap: 20px; padding: 20px; }}
-                    .column {{ flex: 1; background: #f8f9fa; padding: 15px; border-radius: 5px; }}
-                    .highlight-box {{ background: #e74c3c; color: white; padding: 15px; margin: 20px 0; text-align: center; }}
-                    .footer {{ background: #34495e; color: #bdc3c7; padding: 15px; text-align: center; font-size: 12px; }}
+                    .newsletter-container { max-width: 600px; margin: 0 auto; font-family: 'Helvetica', Arial, sans-serif; }
+                    .header { background: #2c3e50; color: white; padding: 20px; text-align: center; }
+                    .two-column { display: flex; gap: 20px; padding: 20px; }
+                    .column { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 5px; }
+                    .highlight-box { background: #e74c3c; color: white; padding: 15px; margin: 20px 0; text-align: center; }
+                    .footer { background: #34495e; color: #bdc3c7; padding: 15px; text-align: center; font-size: 12px; }
                 </style>
             </head>
             <body>
@@ -314,8 +313,7 @@ impl EmailMessage {
                 </div>
             </body>
             </html>
-        "#
-        );
+        "#.to_string();
         self.html_body = Some(html);
         self.body_type = BodyType::Html;
         self

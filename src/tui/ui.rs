@@ -1,5 +1,4 @@
 use crate::tui::app::{App, AppState};
-use crate::thread::Message;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -79,14 +78,14 @@ fn draw_email_list(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_email_view(f: &mut Frame, app: &mut App, area: Rect) {
-    if let Some(message) = &app.current_email {
+    if app.current_email.is_some() {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(6), Constraint::Min(1)])
+            .constraints([Constraint::Length(7), Constraint::Min(1)])
             .split(area);
 
         // Email headers
-        draw_email_headers(f, message, chunks[0]);
+        draw_email_headers(f, app, chunks[0]);
         
         // Email body
         draw_email_body(f, app, chunks[1]);
@@ -97,7 +96,11 @@ fn draw_email_view(f: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-fn draw_email_headers(f: &mut Frame, message: &Message, area: Rect) {
+fn draw_email_headers(f: &mut Frame, app: &App, area: Rect) {
+    let message = match &app.current_email {
+        Some(msg) => msg,
+        None => return,
+    };
     let from = &message.headers.from;
     let to = &message.headers.to;
     let subject = &message.headers.subject;
@@ -105,7 +108,7 @@ fn draw_email_headers(f: &mut Frame, message: &Message, area: Rect) {
         .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
         .unwrap_or_else(|| "Unknown".to_string());
 
-    let headers_text = vec![
+    let mut headers_text = vec![
         Line::from(vec![
             Span::styled("From: ", Style::default().add_modifier(Modifier::BOLD)),
             Span::raw(from),
@@ -124,6 +127,14 @@ fn draw_email_headers(f: &mut Frame, message: &Message, area: Rect) {
         ]),
     ];
 
+    // Add thread info if this is part of a multi-message thread
+    if let Some(thread_info) = app.get_thread_info() {
+        headers_text.push(Line::from(vec![
+            Span::styled("Thread: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(thread_info, Style::default().fg(Color::Yellow)),
+        ]));
+    }
+
     let headers = Paragraph::new(headers_text)
         .block(Block::default().borders(Borders::ALL).title("Headers"))
         .wrap(Wrap { trim: true });
@@ -133,13 +144,26 @@ fn draw_email_headers(f: &mut Frame, message: &Message, area: Rect) {
 
 fn draw_email_body(f: &mut Frame, app: &App, area: Rect) {
     // Use the processed email body text if available
-    let body_text = app.current_email_body.as_ref()
-        .map(|text| text.clone())
+    let body_text = app.current_email_body.clone()
         .unwrap_or_else(|| "[No body content]".to_string());
 
+    // Count total lines for scroll indicators
+    let lines: Vec<&str> = body_text.lines().collect();
+    let total_lines = lines.len();
+    
+    // Create title with scroll indicator
+    let title = if total_lines > (area.height as usize).saturating_sub(2) {
+        format!("Content (scroll: {}/{} lines)", 
+               app.scroll_position + 1, 
+               total_lines.max(1))
+    } else {
+        "Content".to_string()
+    };
+
     let paragraph = Paragraph::new(body_text)
-        .block(Block::default().borders(Borders::ALL).title("Content"))
-        .wrap(Wrap { trim: true });
+        .block(Block::default().borders(Borders::ALL).title(title))
+        .wrap(Wrap { trim: true })
+        .scroll((app.scroll_position as u16, 0));
 
     f.render_widget(paragraph, area);
 }
@@ -169,8 +193,10 @@ fn draw_help(f: &mut Frame, _app: &mut App, area: Rect) {
         Line::from("Whynot TUI - Keyboard Shortcuts"),
         Line::from(""),
         Line::from("Navigation:"),
-        Line::from("  j/↓     - Move down"),
-        Line::from("  k/↑     - Move up"),
+        Line::from("  j/↓     - Move down (email list) / Scroll down (email view)"),
+        Line::from("  k/↑     - Move up (email list) / Scroll up (email view)"),
+        Line::from("  PgUp/PgDn - Page up/down (email view)"),
+        Line::from("  Home/G  - Go to top/bottom (email view)"),
         Line::from("  Enter   - Open selected email"),
         Line::from("  Esc     - Go back"),
         Line::from(""),
@@ -180,6 +206,7 @@ fn draw_help(f: &mut Frame, _app: &mut App, area: Rect) {
         Line::from("  r       - Reply (from email view)"),
         Line::from("  R       - Reply all (from email view)"),
         Line::from("  f       - Forward (from email view)"),
+        Line::from("  n/p     - Next/previous message in thread (email view)"),
         Line::from("  ?       - Show this help"),
         Line::from("  q       - Quit"),
         Line::from(""),

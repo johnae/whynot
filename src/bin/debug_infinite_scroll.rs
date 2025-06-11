@@ -1,4 +1,3 @@
-use std::net::SocketAddr;
 use whynot::client::{NotmuchClient};
 use whynot::web::{AppState, WebConfig, create_app};
 
@@ -17,9 +16,9 @@ async fn main() {
         let mut mbox_builder = MboxBuilder::new();
         for i in 1..=15 {
             mbox_builder = mbox_builder.add_message(
-                EmailMessage::new(&format!("Test message {}", i))
-                    .with_from(&format!("sender{}@example.com", i))
-                    .with_body(&format!("This is test message number {}", i)),
+                EmailMessage::new(format!("Test message {}", i))
+                    .with_from(format!("sender{}@example.com", i))
+                    .with_body(format!("This is test message number {}", i)),
             );
         }
         let mbox = mbox_builder.build();

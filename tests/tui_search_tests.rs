@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tui_search_tests {
-    use whynot::tui::app::{App, AppState};
+    use whynot::tui::app::AppState;
     
     #[test]
     fn test_search_input_handling() {

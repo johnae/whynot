@@ -212,4 +212,76 @@ impl Event {
             })
         )
     }
+
+    /// Check if this is a page up key
+    pub fn is_page_up(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                code: KeyCode::PageUp,
+                modifiers: KeyModifiers::NONE,
+                ..
+            })
+        )
+    }
+
+    /// Check if this is a page down key
+    pub fn is_page_down(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                code: KeyCode::PageDown,
+                modifiers: KeyModifiers::NONE,
+                ..
+            })
+        )
+    }
+
+    /// Check if this is a go-to-top key (g followed by g, or Home)
+    pub fn is_top(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                code: KeyCode::Home,
+                modifiers: KeyModifiers::NONE,
+                ..
+            })
+        )
+    }
+
+    /// Check if this is a go-to-bottom key (G or End)
+    pub fn is_bottom(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('G') | KeyCode::End,
+                modifiers: KeyModifiers::NONE,
+                ..
+            })
+        )
+    }
+
+    /// Check if this is a next message key (n)
+    pub fn is_next_message(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('n'),
+                modifiers: KeyModifiers::NONE,
+                ..
+            })
+        )
+    }
+
+    /// Check if this is a previous message key (p)
+    pub fn is_prev_message(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('p'),
+                modifiers: KeyModifiers::NONE,
+                ..
+            })
+        )
+    }
 }

@@ -1,6 +1,5 @@
 use headless_chrome::{Browser, LaunchOptions, protocol::cdp::Page};
 use reqwest::Client;
-use serde_json;
 use std::fs;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -53,7 +52,7 @@ impl PostImprovementAssessment {
         for i in 0..20 {
             match self
                 .client
-                .get(&format!("{}/test/email-gallery", SERVER_URL))
+                .get(format!("{}/test/email-gallery", SERVER_URL))
                 .send()
                 .await
             {
@@ -415,7 +414,7 @@ impl PostImprovementAssessment {
                     report.push_str(&format!("   • {}\n", note));
                 }
             }
-            report.push_str("\n");
+            report.push('\n');
 
             total_score += score.overall_score;
             if score.overall_score >= 0.7 {

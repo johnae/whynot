@@ -70,7 +70,7 @@ impl BuiltinConverter {
                     } else if lookahead_lower.starts_with("/style") {
                         in_style_tag = false;
                         // Skip until we find the closing >
-                        while let Some(skip_ch) = chars.next() {
+                        for skip_ch in chars.by_ref() {
                             if skip_ch == '>' {
                                 break;
                             }
@@ -79,7 +79,7 @@ impl BuiltinConverter {
                     } else if lookahead_lower.starts_with("/script") {
                         in_script_tag = false;
                         // Skip until we find the closing >
-                        while let Some(skip_ch) = chars.next() {
+                        for skip_ch in chars.by_ref() {
                             if skip_ch == '>' {
                                 break;
                             }

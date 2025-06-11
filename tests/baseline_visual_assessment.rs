@@ -1,6 +1,5 @@
 use headless_chrome::{Browser, LaunchOptions, protocol::cdp::Page};
 use reqwest::Client;
-use serde_json;
 use std::fs;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -57,7 +56,7 @@ impl BaselineVisualAssessment {
         for i in 0..20 {
             match self
                 .client
-                .get(&format!("{}/test/email-gallery", SERVER_URL))
+                .get(format!("{}/test/email-gallery", SERVER_URL))
                 .send()
                 .await
             {
@@ -361,7 +360,7 @@ impl BaselineVisualAssessment {
                             "❌"
                         }
                     ));
-                    report.push_str("\n");
+                    report.push('\n');
                 }
                 Err(e) => {
                     report.push_str(&format!(

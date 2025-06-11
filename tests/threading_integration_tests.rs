@@ -3,7 +3,6 @@
 use whynot::client::NotmuchClient;
 use whynot::test_utils::mbox::{EmailMessage, MboxBuilder};
 use whynot::test_utils::notmuch::TestNotmuch;
-use whynot::web::{AppState, WebConfig};
 
 
 #[tokio::test]
@@ -281,7 +280,7 @@ async fn test_references_header_chain() {
                 .with_from("alice@example.com")
                 .with_to(vec!["test@example.com".to_string()])
                 .with_in_reply_to(reply1_id)
-                .with_additional_header("References", &format!("{} {}", root_id, reply1_id))  // Chain
+                .with_additional_header("References", format!("{} {}", root_id, reply1_id))  // Chain
                 .with_body("Excellent addition!")
         )
         .build();

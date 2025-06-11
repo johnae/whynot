@@ -1,4 +1,3 @@
-use tokio;
 use whynot::tui::app::App;
 use whynot::client::create_client;
 use whynot::config::Config;
@@ -16,7 +15,7 @@ async fn test_tui_html_conversion_basic() {
     let client = Arc::from(client) as Arc<dyn whynot::client::NotmuchClient>;
     
     // Create TUI app with HTML converter (no mail sender for this test)
-    let mut app = App::new(client, None).await.unwrap();
+    let app = App::new(client, None).await.unwrap();
     
     // Create a mock message with HTML content
     let html_content = r#"
@@ -97,7 +96,7 @@ async fn test_tui_plain_text_passthrough() {
     let client = Arc::from(client) as Arc<dyn whynot::client::NotmuchClient>;
     
     // Create TUI app
-    let mut app = App::new(client, None).await.unwrap();
+    let app = App::new(client, None).await.unwrap();
     
     let plain_text = "This is plain text content.\nWith multiple lines.\nAnd no HTML tags.";
     
@@ -151,7 +150,7 @@ async fn test_tui_mixed_content_prefers_plain_text() {
     let client = Arc::from(client) as Arc<dyn whynot::client::NotmuchClient>;
     
     // Create TUI app
-    let mut app = App::new(client, None).await.unwrap();
+    let app = App::new(client, None).await.unwrap();
     
     let plain_text = "This is the plain text version.";
     let html_content = "<html><body><p>This is the HTML version.</p></body></html>";

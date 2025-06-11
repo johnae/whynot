@@ -50,7 +50,7 @@ impl VisualTestSetup {
         for _ in 0..20 {
             if let Ok(_) = self
                 .client
-                .get(&format!("{}/test/email-gallery", self.server_url))
+                .get(format!("{}/test/email-gallery", self.server_url))
                 .send()
                 .await
             {

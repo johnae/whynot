@@ -1,7 +1,7 @@
 use crate::client::NotmuchClient;
 use crate::error::NotmuchError;
 use crate::search::SearchItem;
-use crate::thread::Message;
+use crate::thread::{Message, Thread};
 use crate::text_renderer::{HtmlToTextConverter, TextRendererConfig, TextRendererFactory};
 use crate::mail_sender::{MailSender, ComposableMessage};
 use std::sync::Arc;
@@ -59,6 +59,12 @@ pub struct App {
     /// Currently selected email index
     pub selected_email: usize,
     
+    /// Current thread being viewed (if in EmailView state)
+    pub current_thread: Option<Thread>,
+    
+    /// Index of current message within the thread
+    pub current_message_index: usize,
+    
     /// Current email being viewed (if in EmailView state)
     pub current_email: Option<Message>,
     
@@ -101,6 +107,8 @@ impl App {
             should_quit: false,
             search_results: Vec::new(),
             selected_email: 0,
+            current_thread: None,
+            current_message_index: 0,
             current_email: None,
             current_email_body: None,
             search_query: String::new(),
@@ -149,23 +157,136 @@ impl App {
         }
     }
 
+    /// Scroll email content up (decrease scroll position)
+    pub fn scroll_up(&mut self) {
+        if self.scroll_position > 0 {
+            self.scroll_position -= 1;
+        }
+    }
+
+    /// Scroll email content down (increase scroll position)
+    pub fn scroll_down(&mut self) {
+        self.scroll_position += 1;
+    }
+
+    /// Scroll email content up by page
+    pub fn page_up(&mut self) {
+        self.scroll_position = self.scroll_position.saturating_sub(10);
+    }
+
+    /// Scroll email content down by page
+    pub fn page_down(&mut self) {
+        self.scroll_position += 10;
+    }
+
+    /// Go to top of email content
+    pub fn scroll_to_top(&mut self) {
+        self.scroll_position = 0;
+    }
+
+    /// Go to bottom of email content (requires content height)
+    pub fn scroll_to_bottom(&mut self, content_height: usize) {
+        if content_height > 10 {
+            self.scroll_position = content_height.saturating_sub(10);
+        }
+    }
+
     /// Open the currently selected email
     pub async fn open_selected_email(&mut self) -> Result<(), NotmuchError> {
         if let Some(search_item) = self.search_results.get(self.selected_email) {
-            // Load the full thread to get the complete message
+            // Load the full thread to get all messages
             let thread = self.client.show(&search_item.thread).await?;
             
-            // For now, just take the first message in the thread
-            if let Some(message) = thread.get_messages().into_iter().next().cloned() {
-                // Process the email body content
-                self.current_email_body = self.process_email_body(&message).await;
-                self.current_email = Some(message);
-            }
+            // Store the thread and start with the first message
+            self.current_thread = Some(thread);
+            self.current_message_index = 0;
+            
+            // Load the first message
+            self.load_current_message().await?;
                 
             self.state = AppState::EmailView;
             self.scroll_position = 0;
         }
         Ok(())
+    }
+
+    /// Load the current message based on thread and message index
+    async fn load_current_message(&mut self) -> Result<(), NotmuchError> {
+        if let Some(ref thread) = self.current_thread {
+            let messages = thread.get_messages();
+            if let Some(&message) = messages.get(self.current_message_index) {
+                // Process the email body content
+                self.current_email_body = self.process_email_body(message).await;
+                self.current_email = Some(message.clone());
+                self.scroll_position = 0; // Reset scroll when switching messages
+            }
+        }
+        Ok(())
+    }
+
+    /// Navigate to the next message in the current thread
+    pub async fn next_message_in_thread(&mut self) -> Result<(), NotmuchError> {
+        let can_advance = if let Some(ref thread) = self.current_thread {
+            let messages = thread.get_messages();
+            self.current_message_index < messages.len().saturating_sub(1)
+        } else {
+            false
+        };
+
+        if can_advance {
+            self.current_message_index += 1;
+            self.load_current_message().await?;
+            
+            // Get message count for status
+            let message_count = self.current_thread.as_ref()
+                .map(|t| t.get_messages().len())
+                .unwrap_or(0);
+            
+            self.set_status(format!("Message {}/{}", 
+                self.current_message_index + 1, 
+                message_count));
+        } else if self.current_thread.is_some() {
+            self.set_status("At last message in thread".to_string());
+        }
+        Ok(())
+    }
+
+    /// Navigate to the previous message in the current thread
+    pub async fn prev_message_in_thread(&mut self) -> Result<(), NotmuchError> {
+        let can_go_back = self.current_message_index > 0 && self.current_thread.is_some();
+
+        if can_go_back {
+            self.current_message_index -= 1;
+            self.load_current_message().await?;
+            
+            // Get message count for status
+            let message_count = self.current_thread.as_ref()
+                .map(|t| t.get_messages().len())
+                .unwrap_or(0);
+            
+            self.set_status(format!("Message {}/{}", 
+                self.current_message_index + 1, 
+                message_count));
+        } else if self.current_thread.is_some() {
+            self.set_status("At first message in thread".to_string());
+        }
+        Ok(())
+    }
+
+    /// Get thread info for display
+    pub fn get_thread_info(&self) -> Option<String> {
+        if let Some(ref thread) = self.current_thread {
+            let messages = thread.get_messages();
+            if messages.len() > 1 {
+                Some(format!("Thread: Message {}/{}", 
+                    self.current_message_index + 1, 
+                    messages.len()))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 
     /// Go back to the previous view
@@ -247,26 +368,20 @@ impl App {
 
         // First try to find a plain text part
         if let Some(text_part) = message.body.iter().find(|part| part.content_type.starts_with("text/plain")) {
-            match &text_part.content {
-                crate::body::BodyContent::Text(text) => return Some(text.clone()),
-                _ => {}
-            }
+            if let crate::body::BodyContent::Text(text) = &text_part.content { return Some(text.clone()) }
         }
 
         // If no plain text, try to convert HTML to text
         if let Some(html_part) = message.body.iter().find(|part| part.content_type.starts_with("text/html")) {
-            match &html_part.content {
-                crate::body::BodyContent::Text(html) => {
-                    // Convert HTML to text using our text renderer
-                    match self.html_converter.convert(html).await {
-                        Ok(converted_text) => return Some(converted_text),
-                        Err(e) => {
-                            // Fallback to showing raw HTML if conversion fails
-                            return Some(format!("[HTML conversion failed: {}]\n\n{}", e, html));
-                        }
+            if let crate::body::BodyContent::Text(html) = &html_part.content {
+                // Convert HTML to text using our text renderer
+                match self.html_converter.convert(html).await {
+                    Ok(converted_text) => return Some(converted_text),
+                    Err(e) => {
+                        // Fallback to showing raw HTML if conversion fails
+                        return Some(format!("[HTML conversion failed: {}]\n\n{}", e, html));
                     }
                 }
-                _ => {}
             }
         }
 
@@ -451,7 +566,7 @@ impl App {
                             .build()
                             .map_err(|e| NotmuchError::ConfigError(format!("Failed to build reply: {}", e)))?;
 
-                        let _message_id = mail_sender.reply(&original_message, reply, is_reply_all).await
+                        let _message_id = mail_sender.reply(original_message, reply, is_reply_all).await
                             .map_err(|e| NotmuchError::MailSendError(format!("Failed to send reply: {}", e)))?;
                         
                         self.set_status("Reply sent successfully".to_string());
@@ -480,7 +595,7 @@ impl App {
                         let forward = builder.build()
                             .map_err(|e| NotmuchError::ConfigError(format!("Failed to build forward: {}", e)))?;
 
-                        let _message_id = mail_sender.forward(&original_message, forward).await
+                        let _message_id = mail_sender.forward(original_message, forward).await
                             .map_err(|e| NotmuchError::MailSendError(format!("Failed to send forward: {}", e)))?;
                         
                         self.set_status("Email forwarded successfully".to_string());
