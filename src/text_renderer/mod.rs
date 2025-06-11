@@ -184,7 +184,7 @@ mod tests {
     #[tokio::test]
     async fn test_detect_available_tools() {
         // This test might find tools on the system, or return empty list
-        let tools = TextRendererFactory::detect_available_tools().await;
+        let _tools = TextRendererFactory::detect_available_tools().await;
         // Just ensure it doesn't panic and returns a vector
         // Note: This assertion is trivial since len() is always >= 0, but kept for clarity
     }

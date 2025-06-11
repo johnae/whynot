@@ -17,18 +17,179 @@ impl BuiltinConverter {
         Self { config }
     }
     
-    /// Convert HTML to plain text using simple text extraction
-    /// This is a basic implementation that strips HTML tags and formats the content
+    /// Convert HTML to plain text using improved text extraction
+    /// This implementation handles CSS removal, better formatting, and structure preservation
     fn convert_html_to_text(&self, html: &str) -> TextRendererResult<String> {
-        // For now, implement a simple version that strips HTML tags
-        // TODO: In a future iteration, we'll use a proper HTML parser like scraper
-        let text = self.strip_html_tags(html);
-        let wrapped = self.wrap_text(&text);
+        // Remove CSS styles and script content first
+        let cleaned_html = self.remove_css_and_scripts(html);
+        
+        // Strip HTML tags with better structure handling
+        let text = self.strip_html_tags_improved(&cleaned_html);
+        
+        // Clean up whitespace more aggressively
+        let cleaned = self.clean_whitespace_improved(&text);
+        
+        // Wrap text to configured width
+        let wrapped = self.wrap_text(&cleaned);
+        
         Ok(wrapped)
     }
     
-    /// Simple HTML tag stripping (temporary implementation)
-    fn strip_html_tags(&self, html: &str) -> String {
+    /// Remove CSS styles, script tags, and other non-content elements
+    fn remove_css_and_scripts(&self, html: &str) -> String {
+        let mut result = String::new();
+        let mut chars = html.chars().peekable();
+        let mut in_style_tag = false;
+        let mut in_script_tag = false;
+        let mut in_tag = false;
+        let mut current_tag = String::new();
+        
+        while let Some(ch) = chars.next() {
+            match ch {
+                '<' => {
+                    in_tag = true;
+                    current_tag.clear();
+                    
+                    // Look ahead to see if this is a style or script tag
+                    let mut lookahead = String::new();
+                    let mut temp_chars = chars.clone();
+                    for _ in 0..10 {
+                        if let Some(next_ch) = temp_chars.next() {
+                            lookahead.push(next_ch);
+                            if next_ch == '>' {
+                                break;
+                            }
+                        }
+                    }
+                    
+                    let lookahead_lower = lookahead.to_lowercase();
+                    if lookahead_lower.starts_with("style") {
+                        in_style_tag = true;
+                    } else if lookahead_lower.starts_with("script") {
+                        in_script_tag = true;
+                    } else if lookahead_lower.starts_with("/style") {
+                        in_style_tag = false;
+                        // Skip until we find the closing >
+                        while let Some(skip_ch) = chars.next() {
+                            if skip_ch == '>' {
+                                break;
+                            }
+                        }
+                        continue;
+                    } else if lookahead_lower.starts_with("/script") {
+                        in_script_tag = false;
+                        // Skip until we find the closing >
+                        while let Some(skip_ch) = chars.next() {
+                            if skip_ch == '>' {
+                                break;
+                            }
+                        }
+                        continue;
+                    }
+                    
+                    if !in_style_tag && !in_script_tag {
+                        result.push(ch);
+                    }
+                }
+                '>' => {
+                    in_tag = false;
+                    if !in_style_tag && !in_script_tag {
+                        result.push(ch);
+                    }
+                }
+                _ => {
+                    if in_tag {
+                        current_tag.push(ch);
+                    }
+                    
+                    if !in_style_tag && !in_script_tag {
+                        result.push(ch);
+                    }
+                }
+            }
+        }
+        
+        // Remove inline style attributes
+        self.remove_inline_styles(&result)
+    }
+    
+    /// Remove inline style attributes from HTML
+    fn remove_inline_styles(&self, html: &str) -> String {
+        let mut result = String::new();
+        let mut chars = html.chars().peekable();
+        let mut in_tag = false;
+        let mut in_style_attr = false;
+        let mut quote_char: Option<char> = None;
+        
+        while let Some(ch) = chars.next() {
+            match ch {
+                '<' => {
+                    in_tag = true;
+                    result.push(ch);
+                }
+                '>' => {
+                    in_tag = false;
+                    in_style_attr = false;
+                    quote_char = None;
+                    result.push(ch);
+                }
+                _ if in_tag => {
+                    // Check if we're starting a style attribute
+                    if !in_style_attr && ch == 's' {
+                        let mut lookahead = String::new();
+                        let mut temp_chars = chars.clone();
+                        lookahead.push(ch);
+                        for _ in 0..6 {
+                            if let Some(next_ch) = temp_chars.next() {
+                                lookahead.push(next_ch);
+                                if lookahead.len() >= 6 {
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if lookahead.to_lowercase().starts_with("style=") {
+                            in_style_attr = true;
+                            // Skip the "style=" part
+                            for _ in 0..5 {
+                                chars.next();
+                            }
+                            // Determine quote character
+                            if let Some(&next_ch) = chars.peek() {
+                                if next_ch == '"' || next_ch == '\'' {
+                                    quote_char = Some(next_ch);
+                                    chars.next(); // Skip the opening quote
+                                }
+                            }
+                            continue;
+                        }
+                    }
+                    
+                    if in_style_attr {
+                        // Skip everything until we close the style attribute
+                        if let Some(q) = quote_char {
+                            if ch == q {
+                                in_style_attr = false;
+                                quote_char = None;
+                            }
+                        } else if ch.is_whitespace() {
+                            in_style_attr = false;
+                        }
+                    } else {
+                        result.push(ch);
+                    }
+                }
+                _ => {
+                    result.push(ch);
+                }
+            }
+        }
+        
+        result
+    }
+    
+    /// Improved HTML tag stripping with better structure handling
+    fn strip_html_tags_improved(&self, html: &str) -> String {
         let mut result = String::new();
         let mut in_tag = false;
         let mut chars = html.chars().peekable();
@@ -37,104 +198,189 @@ impl BuiltinConverter {
             match ch {
                 '<' => {
                     in_tag = true;
-                    // Handle some common cases for better formatting
-                    if self.starts_with_tag(&mut chars, "br") || 
-                       self.starts_with_tag(&mut chars, "p") ||
-                       self.starts_with_tag(&mut chars, "/p") {
-                        result.push('\n');
-                    } else if self.starts_with_tag(&mut chars, "h1") ||
-                              self.starts_with_tag(&mut chars, "h2") ||
-                              self.starts_with_tag(&mut chars, "h3") {
-                        result.push_str("\n\n");
+                    
+                    // Look ahead to handle specific tags for better formatting
+                    let mut lookahead = String::new();
+                    let mut temp_chars = chars.clone();
+                    for _ in 0..10 {
+                        if let Some(next_ch) = temp_chars.next() {
+                            lookahead.push(next_ch.to_ascii_lowercase());
+                            if next_ch == '>' || next_ch.is_whitespace() {
+                                break;
+                            }
+                        }
                     }
-                },
+                    
+                    // Add appropriate spacing for different tags
+                    match lookahead.as_str() {
+                        tag if tag.starts_with("br") || tag.starts_with("br/") => {
+                            result.push('\n');
+                        }
+                        tag if tag.starts_with("p") || tag.starts_with("/p") => {
+                            result.push_str("\n\n");
+                        }
+                        tag if tag.starts_with("div") || tag.starts_with("/div") => {
+                            result.push('\n');
+                        }
+                        tag if tag.starts_with("h1") || tag.starts_with("h2") || 
+                               tag.starts_with("h3") || tag.starts_with("h4") ||
+                               tag.starts_with("h5") || tag.starts_with("h6") => {
+                            result.push_str("\n\n");
+                        }
+                        tag if tag.starts_with("/h1") || tag.starts_with("/h2") || 
+                               tag.starts_with("/h3") || tag.starts_with("/h4") ||
+                               tag.starts_with("/h5") || tag.starts_with("/h6") => {
+                            result.push_str("\n\n");
+                        }
+                        tag if tag.starts_with("li") => {
+                            result.push_str("\n• ");
+                        }
+                        tag if tag.starts_with("tr") || tag.starts_with("/tr") => {
+                            result.push('\n');
+                        }
+                        tag if tag.starts_with("td") || tag.starts_with("th") => {
+                            result.push('\t');
+                        }
+                        tag if tag.starts_with("blockquote") => {
+                            result.push_str("\n> ");
+                        }
+                        _ => {}
+                    }
+                }
                 '>' => {
                     in_tag = false;
-                },
+                }
                 _ if !in_tag => {
                     result.push(ch);
-                },
+                }
                 _ => {} // Skip characters inside tags
             }
         }
         
-        // Clean up excessive whitespace
-        self.clean_whitespace(&result)
+        result
     }
     
-    /// Check if the character sequence starts with a specific HTML tag
-    fn starts_with_tag(&self, chars: &mut std::iter::Peekable<std::str::Chars>, tag: &str) -> bool {
-        let mut temp_chars = Vec::new();
-        
-        for expected in tag.chars() {
-            if let Some(&ch) = chars.peek() {
-                temp_chars.push(ch);
-                if ch.to_ascii_lowercase() == expected {
-                    chars.next();
-                } else {
-                    // Restore characters we peeked at
-                    for _ in temp_chars {
-                        // Note: We can't actually restore chars to the iterator
-                        // This is a limitation of this simple approach
-                    }
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        }
-        
-        true
-    }
-    
-    /// Clean up excessive whitespace while preserving intentional line breaks
-    fn clean_whitespace(&self, text: &str) -> String {
+    /// Improved whitespace cleanup
+    fn clean_whitespace_improved(&self, text: &str) -> String {
         let mut result = String::new();
         let mut prev_was_space = false;
-        let mut prev_was_newline = false;
+        let mut consecutive_newlines = 0;
         
         for ch in text.chars() {
             match ch {
                 '\n' => {
-                    if !prev_was_newline {
+                    consecutive_newlines += 1;
+                    if consecutive_newlines <= 2 {
                         result.push('\n');
-                        prev_was_newline = true;
                         prev_was_space = false;
                     }
-                },
+                }
                 ' ' | '\t' | '\r' => {
-                    if !prev_was_space && !prev_was_newline {
+                    if !prev_was_space && consecutive_newlines == 0 {
                         result.push(' ');
                         prev_was_space = true;
                     }
-                },
+                }
                 _ => {
                     result.push(ch);
                     prev_was_space = false;
-                    prev_was_newline = false;
+                    consecutive_newlines = 0;
                 }
             }
         }
         
-        result.trim().to_string()
+        // Remove leading/trailing whitespace and normalize line endings
+        result.trim().replace("\n ", "\n").replace(" \n", "\n")
     }
     
-    /// Wrap text to the configured width
+    
+    /// Wrap text to the configured width with improved handling
     fn wrap_text(&self, text: &str) -> String {
         let mut result = String::new();
         
         for line in text.lines() {
-            if line.trim().is_empty() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
                 result.push('\n');
                 continue;
             }
             
-            let wrapped_line = self.wrap_line(line, self.config.text_width);
-            result.push_str(&wrapped_line);
+            // Handle special formatting prefixes
+            if trimmed.starts_with('•') || trimmed.starts_with('>') {
+                let wrapped_line = self.wrap_line_with_prefix(trimmed, self.config.text_width);
+                result.push_str(&wrapped_line);
+            } else {
+                let wrapped_line = self.wrap_line(trimmed, self.config.text_width);
+                result.push_str(&wrapped_line);
+            }
             result.push('\n');
         }
         
         result
+    }
+    
+    /// Wrap a line that has a special prefix (like bullet points or quotes)
+    fn wrap_line_with_prefix(&self, line: &str, width: usize) -> String {
+        if line.len() <= width {
+            return line.to_string();
+        }
+        
+        let prefix = if line.starts_with('•') {
+            "• "
+        } else if line.starts_with('>') {
+            "> "
+        } else {
+            ""
+        };
+        
+        let content = if !prefix.is_empty() {
+            &line[prefix.len()..]
+        } else {
+            line
+        };
+        
+        let indent = " ".repeat(prefix.len());
+        let effective_width = width.saturating_sub(prefix.len());
+        
+        let mut result = String::new();
+        let mut first_line = true;
+        
+        for wrapped_part in self.wrap_content(content, effective_width) {
+            if first_line {
+                result.push_str(prefix);
+                first_line = false;
+            } else {
+                result.push('\n');
+                result.push_str(&indent);
+            }
+            result.push_str(&wrapped_part);
+        }
+        
+        result
+    }
+    
+    /// Split content into chunks that fit within the given width
+    fn wrap_content(&self, content: &str, width: usize) -> Vec<String> {
+        let mut lines = Vec::new();
+        let mut current_line = String::new();
+        
+        for word in content.split_whitespace() {
+            if current_line.is_empty() {
+                current_line = word.to_string();
+            } else if current_line.len() + 1 + word.len() <= width {
+                current_line.push(' ');
+                current_line.push_str(word);
+            } else {
+                lines.push(current_line);
+                current_line = word.to_string();
+            }
+        }
+        
+        if !current_line.is_empty() {
+            lines.push(current_line);
+        }
+        
+        lines
     }
     
     /// Wrap a single line to the specified width
@@ -207,6 +453,73 @@ mod tests {
     }
     
     #[tokio::test]
+    async fn test_css_removal() {
+        let converter = create_test_converter();
+        let html = r#"<div style="color: red; font-size: 14px;">Hello <span style="font-weight: bold;">world</span>!</div>"#;
+        let result = converter.convert(html).await.unwrap();
+        assert!(result.contains("Hello world!"));
+        assert!(!result.contains("color: red"));
+        assert!(!result.contains("font-size"));
+        assert!(!result.contains("style="));
+    }
+    
+    #[tokio::test]
+    async fn test_script_and_style_tag_removal() {
+        let converter = create_test_converter();
+        let html = r#"
+            <html>
+                <head>
+                    <style>
+                        body { font-family: Arial; }
+                        .header { color: blue; }
+                    </style>
+                    <script>
+                        alert('Hello world');
+                        console.log('test');
+                    </script>
+                </head>
+                <body>
+                    <p>Visible content</p>
+                </body>
+            </html>
+        "#;
+        let result = converter.convert(html).await.unwrap();
+        assert!(result.contains("Visible content"));
+        assert!(!result.contains("font-family"));
+        assert!(!result.contains("alert"));
+        assert!(!result.contains("console.log"));
+    }
+    
+    #[tokio::test]
+    async fn test_list_formatting() {
+        let converter = create_test_converter();
+        let html = "<ul><li>First item</li><li>Second item</li></ul>";
+        let result = converter.convert(html).await.unwrap();
+        assert!(result.contains("• First item"));
+        assert!(result.contains("• Second item"));
+    }
+    
+    #[tokio::test]
+    async fn test_heading_formatting() {
+        let converter = create_test_converter();
+        let html = "<h1>Main Title</h1><p>Some content</p><h2>Subtitle</h2>";
+        let result = converter.convert(html).await.unwrap();
+        assert!(result.contains("Main Title"));
+        assert!(result.contains("Subtitle"));
+        // Check that headings have proper spacing
+        let lines: Vec<&str> = result.lines().collect();
+        assert!(lines.len() > 3); // Should have spacing between elements
+    }
+    
+    #[tokio::test]
+    async fn test_blockquote_formatting() {
+        let converter = create_test_converter();
+        let html = "<blockquote>This is a quoted text</blockquote>";
+        let result = converter.convert(html).await.unwrap();
+        assert!(result.contains("> This is a quoted text"));
+    }
+    
+    #[tokio::test]
     async fn test_html_with_line_breaks() {
         let converter = create_test_converter();
         let html = "<p>First paragraph</p><br><p>Second paragraph</p>";
@@ -242,10 +555,10 @@ mod tests {
     }
     
     #[test]
-    fn test_clean_whitespace() {
+    fn test_clean_whitespace_improved() {
         let converter = create_test_converter();
         let messy_text = "Hello    world\n\n\nwith   spaces";
-        let cleaned = converter.clean_whitespace(messy_text);
+        let cleaned = converter.clean_whitespace_improved(messy_text);
         assert!(!cleaned.contains("    "));
         assert!(!cleaned.contains("\n\n\n"));
     }
