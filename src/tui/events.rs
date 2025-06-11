@@ -284,4 +284,16 @@ impl Event {
             })
         )
     }
+
+    /// Check if this is a markdown toggle key (Ctrl+M)
+    pub fn is_markdown_toggle(&self) -> bool {
+        matches!(
+            self,
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('m'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
+            })
+        )
+    }
 }
