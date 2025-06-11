@@ -3,7 +3,9 @@ use crate::config::Config;
 use crate::error::NotmuchError;
 use crate::mail_sender::{ComposableMessage, MailSender};
 use crate::search::SearchItem;
-use crate::text_renderer::{HtmlToTextConverter, TextRendererConfig, TextRendererFactory, styled::StyledTextConverter};
+use crate::text_renderer::{
+    HtmlToTextConverter, TextRendererConfig, TextRendererFactory, styled::StyledTextConverter,
+};
 use crate::thread::{Message, Thread};
 use ratatui::text::Text;
 use std::sync::Arc;
@@ -112,11 +114,11 @@ impl App {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         // Check if styled text is enabled
         let styled_text_enabled = config.ui.tui.styled_text.unwrap_or(false);
-        
+
         // Create HTML to text converter (always need this for compatibility)
         let text_config = TextRendererConfig::default();
         let html_converter = TextRendererFactory::create_converter(&text_config).await?;
-        
+
         // Create styled converter if enabled
         let styled_converter = if styled_text_enabled {
             Some(StyledTextConverter::new(TextRendererConfig::default()))
@@ -476,7 +478,10 @@ impl App {
 
     /// Recursively search through body parts to find text content and return styled Text
     /// Prefers plain text over HTML, and recursively searches multipart containers
-    async fn find_text_content_styled(&self, parts: &[crate::body::BodyPart]) -> Option<Text<'static>> {
+    async fn find_text_content_styled(
+        &self,
+        parts: &[crate::body::BodyPart],
+    ) -> Option<Text<'static>> {
         // Use iterative approach with a stack to avoid async recursion issues
         let mut stack: Vec<&[crate::body::BodyPart]> = vec![parts];
 
@@ -510,7 +515,9 @@ impl App {
                                     Err(e) => {
                                         // Fallback to plain text conversion if styled fails
                                         match self.html_converter.convert(html).await {
-                                            Ok(converted_text) => return Some(Text::from(converted_text)),
+                                            Ok(converted_text) => {
+                                                return Some(Text::from(converted_text));
+                                            }
                                             Err(_) => {
                                                 return Some(Text::from(format!(
                                                     "[HTML conversion failed: {}]\n\n{}",
