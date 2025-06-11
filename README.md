@@ -1,30 +1,52 @@
 # Whynot Mail
 
-A Rust-based email interface for [notmuch](https://notmuchmail.org/) that doesn't suck. Because why not have nice things?
+A complete Rust-based email client for [notmuch](https://notmuchmail.org/) with both web and terminal interfaces. Because why not have nice things?
 
 ## What's This About?
 
-If you use notmuch to index your email but miss having a decent interface to actually *read* it, this project might be for you. Currently features a simple, modern clean web UI that can connect to either a local notmuch database or a remote one over SSH. I.e webmail.
+If you use notmuch to index your email but miss having decent interfaces to actually *use* it, this project is for you. Features both a modern web UI and a fully-functional terminal interface, with complete email reading, searching, and sending capabilities. Works with local notmuch databases or remote ones over SSH.
 
-**Fair warning**: This is very early-stage software with plenty of rough edges and probably some bugs lurking around. Use at your own risk, but feel free to file issues if you find anything particularly broken.
+**Status**: Production-ready for daily email use with comprehensive functionality and thorough testing.
 
-## Current Features
+## Features
 
-- 🕸️ **Web Interface**: Clean, modern web UI with light/dark mode toggle
-- 🔍 **Search & Browse**: Full notmuch search capabilities with tag filtering
-- 📧 **Thread View**: Read email threads with proper formatting and attachments
-- 🌐 **Local & Remote**: Works with local notmuch or remote over SSH
-- 🎨 **Modern Stack**: Built with Axum, Askama templates, and a touch of HTMX
+### 🕸️ **Web Interface**
+- **Modern UI**: Clean, GitHub-inspired interface with light/dark mode toggle
+- **Complete Email Workflow**: Read, compose, reply, reply-all, forward emails
+- **Smart Threading**: Navigate email conversations with proper message threading
+- **Auto-refresh**: Automatic inbox updates with configurable intervals
+- **Infinite Scroll**: Efficient pagination for large mailboxes
+- **Rich Content**: HTML emails with image toggle and link safety warnings
 
-## The Plan
+### 🖥️ **Terminal Interface (TUI)**
+- **Full-featured**: Complete email client with vim-like navigation (j/k, /, ?)
+- **Content Scrolling**: Navigate long emails with j/k, Page Up/Down, Home/G
+- **Thread Navigation**: Access all messages in threads with n/p keys
+- **HTML Support**: Rich HTML emails converted to readable terminal text
+- **Complete Composition**: Write, reply, and send emails with multi-line support
+- **Search Integration**: Full notmuch query support with modal interface
 
-I started with a webui, but I'd like to do some more stuff:
+### 📧 **Email Management**
+- **Reading**: Full notmuch search capabilities with tag filtering and thread view
+- **Writing**: Complete composition with reply/forward, proper threading headers
+- **Sending**: msmtp integration (local and remote) with connection testing
+- **Attachments**: View and download email attachments safely
+- **Threading**: Proper email conversation handling with References/In-Reply-To
+
+### 🌐 **Connectivity**
+- **Local & Remote**: Works with local notmuch or remote over SSH
+- **Unified Config**: Single configuration system for all components
+- **SSH Reliability**: Robust connection handling with automatic retries
+
+## Implementation Status
 
 1. ✅ **Data Layer**: Comprehensive Rust types for all notmuch JSON output
 2. ✅ **Client Layer**: Unified interface for local/remote notmuch execution  
-3. ✅ **Web UI**: What you see now - GitHub-inspired webmail interface
-4. 🚧 **TUI**: Terminal interface using [ratatui](https://ratatui.rs/) (I really want this so I'll be working on this soon)
-5. 🔮 **Mobile/Desktop**: Maybe native apps someday?
+3. ✅ **Web UI**: Complete GitHub-inspired webmail interface with full functionality
+4. ✅ **TUI**: Full-featured terminal interface using [ratatui](https://ratatui.rs/)
+5. ✅ **Mail Sending**: Complete msmtp integration with local/remote support
+6. ✅ **Configuration**: Unified config system with CLI/env/file precedence
+7. 🔮 **Future**: Mobile/desktop apps, advanced features, integrations
 
 ## Getting Started
 
@@ -32,6 +54,7 @@ I started with a webui, but I'd like to do some more stuff:
 
 - Rust (2024 edition)
 - A working notmuch setup (local or remote)
+- **For sending email**: [msmtp](https://marlam.de/msmtp/) configured (local or remote)
 - [devenv.sh](https://devenv.sh/) for the development environment (optional but recommended)
 
 ### Quick Start
@@ -41,17 +64,24 @@ I started with a webui, but I'd like to do some more stuff:
 git clone https://github.com/johnae/whynot
 cd whynot
 
-# For local notmuch
+# Web Interface - local notmuch
 cargo run --bin whynot-web
 
-# Custom bind address
+# Web Interface - custom bind address  
 cargo run --bin whynot-web -- --bind 0.0.0.0:3000
 
-# For remote notmuch over SSH
-cargo run --bin whynot-web -- --remote your-server --user the-server-user ## this is for remote/ssh access to notmuch
+# Web Interface - remote notmuch over SSH
+cargo run --bin whynot-web -- --notmuch-host your-server --notmuch-user the-server-user
+
+# Terminal Interface - local notmuch
+cargo run --bin whynot-tui
+
+# Terminal Interface - remote notmuch over SSH  
+cargo run --bin whynot-tui -- --notmuch-host your-server --notmuch-user the-server-user
 ```
 
-Then open http://localhost:8080 (the default port) in your browser.
+**Web Interface**: Open http://localhost:8080 (default port) in your browser  
+**Terminal Interface**: Full vim-like email client in your terminal
 
 ### SSH Setup
 
@@ -79,16 +109,44 @@ Whynot supports multiple configuration methods with the following precedence:
 3. **Configuration file**: `~/.config/whynot/config.toml`
 4. **Built-in defaults** (lowest priority)
 
-See `config.example.toml` for a comprehensive example with all available options including mail sending, user identity, and UI customization.
+See `config.example.toml` for a comprehensive example with all available options including:
+- Mail reading (local/remote notmuch setup)  
+- Mail sending (local/remote msmtp configuration)
+- User identity (name, email, signature)
+- UI customization (themes, auto-refresh, pagination)
+- Advanced settings (threading, external tools)
 
-## What's Missing
+## Key Bindings (TUI)
 
-Quite a bit, actually:
+### Navigation
+- `j/k` or `↑/↓` - Move up/down in email list, scroll content in email view
+- `Enter` - Open selected email
+- `Esc` - Go back to previous view
+- `Page Up/Down` - Fast scroll in email view
+- `Home/G` - Jump to top/bottom of email content
 
-- **No compose/send**: This is read-only for now (send mail support is something I really want to add)
-- **No message management**: Can't delete, archive, or organize messages yet
-- **Limited attachment handling**: Basic viewing but no fancy preview, you can download the attachments though
-- **No offline support**: Fully dependent on notmuch being available. This may never change, we'll see.
+### Actions  
+- `/` - Search (supports full notmuch query syntax)
+- `c` - Compose new email (from email list)
+- `r` - Reply to current email (from email view)  
+- `R` - Reply-all to current email (from email view)
+- `f` - Forward current email (from email view)
+- `n/p` - Navigate next/previous message in thread (from email view)
+- `?` - Show help
+- `q` - Quit
+
+### Compose Mode
+- `Tab/Shift+Tab` - Navigate between form fields
+- `Enter` - New line in body field, move to next field in headers
+- `Ctrl+S` - Send email
+- `Esc` - Cancel compose
+
+## Future Enhancements
+
+- **Message Management**: Delete, archive, tag operations
+- **Advanced Features**: External editor integration, GPG support, address book
+- **Performance**: Offline caching, virtual scrolling for very large mailboxes
+- **Integrations**: Calendar invites, link previews, syntax highlighting
 
 ## Development
 
@@ -101,23 +159,29 @@ direnv allow
 # Run tests
 devenv shell cargo test
 
-# Check code quality
+# Check code quality  
 devenv shell cargo clippy --all-targets
 
 # Start the web server
 devenv shell cargo run --bin whynot-web
+
+# Start the terminal interface
+devenv shell cargo run --bin whynot-tui
 ```
 
 ## Architecture
 
-- **Types**: Comprehensive Rust structs for all notmuch JSON formats
-- **Client**: Unified trait-based interface supporting local and SSH execution
-- **Web**: Axum-based server with Askama templates and GitHub-inspired styling
-- **Testing**: Integration tests with temporary notmuch databases
+- **Types**: Comprehensive Rust structs for all notmuch JSON formats with serde support
+- **Client**: Unified trait-based interface supporting local and SSH execution with connection pooling
+- **Mail Sending**: Complete msmtp integration with local/remote support and connection testing
+- **Web**: Axum-based server with Askama templates, GitHub-inspired styling, and HTMX interactivity
+- **TUI**: Full ratatui-based terminal interface with vim-like navigation and complete functionality
+- **Configuration**: Unified system with CLI/environment/file precedence and comprehensive validation
+- **Testing**: Extensive test suite with temporary notmuch databases and integration testing
 
 ## Contributing
 
-It's early days, so don't expect much stability in the APIs. That said, if you find bugs or have ideas for improvements, issues and PRs are welcome.
+The core functionality is complete and stable, but there's always room for improvement! If you find bugs, have ideas for enhancements, or want to contribute new features, issues and PRs are welcome. Please see [DEVELOPMENT.md](./DEVELOPMENT.md) for development guidelines.
 
 ## License
 
@@ -125,4 +189,6 @@ It's early days, so don't expect much stability in the APIs. That said, if you f
 
 ---
 
-*Built with Rust, powered by notmuch, inspired by the desire to have some nice things.*
+*Built with Rust 🦀, powered by notmuch 📧, designed for people who want nice things ✨*
+
+**Ready for daily use - try both the web and terminal interfaces!**
