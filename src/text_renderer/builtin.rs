@@ -26,13 +26,117 @@ impl BuiltinConverter {
         // Strip HTML tags with better structure handling
         let text = self.strip_html_tags_improved(&cleaned_html);
 
+        // Decode HTML entities
+        let decoded = self.decode_html_entities(&text);
+
         // Clean up whitespace more aggressively
-        let cleaned = self.clean_whitespace_improved(&text);
+        let cleaned = self.clean_whitespace_improved(&decoded);
 
         // Wrap text to configured width
         let wrapped = self.wrap_text(&cleaned);
 
         Ok(wrapped)
+    }
+
+    /// Decode HTML entities to their corresponding characters
+    fn decode_html_entities(&self, text: &str) -> String {
+        let mut result = String::new();
+        let mut chars = text.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            if ch == '&' {
+                // Collect the entity
+                let mut entity = String::new();
+                let mut found_semicolon = false;
+
+                // Look ahead up to 10 characters for the entity
+                for _ in 0..10 {
+                    if let Some(&next_ch) = chars.peek() {
+                        if next_ch == ';' {
+                            chars.next(); // Consume the semicolon
+                            found_semicolon = true;
+                            break;
+                        } else if next_ch.is_alphanumeric() || next_ch == '#' {
+                            entity.push(chars.next().unwrap());
+                        } else {
+                            // Invalid entity, break
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                if found_semicolon {
+                    // Try to decode the entity
+                    if let Some(decoded_char) = self.decode_entity(&entity) {
+                        result.push_str(&decoded_char);
+                    } else {
+                        // Unknown entity, keep as-is
+                        result.push('&');
+                        result.push_str(&entity);
+                        result.push(';');
+                    }
+                } else {
+                    // No semicolon found, treat as literal &
+                    result.push('&');
+                    result.push_str(&entity);
+                }
+            } else {
+                result.push(ch);
+            }
+        }
+
+        result
+    }
+
+    /// Decode a specific HTML entity (without & and ;)
+    fn decode_entity(&self, entity: &str) -> Option<String> {
+        match entity {
+            // Common named entities
+            "nbsp" => Some(" ".to_string()),
+            "amp" => Some("&".to_string()),
+            "lt" => Some("<".to_string()),
+            "gt" => Some(">".to_string()),
+            "quot" => Some("\"".to_string()),
+            "apos" | "#39" => Some("'".to_string()),
+            "copy" => Some("©".to_string()),
+            "reg" => Some("®".to_string()),
+            "trade" => Some("™".to_string()),
+            "mdash" => Some("—".to_string()),
+            "ndash" => Some("–".to_string()),
+            "hellip" => Some("…".to_string()),
+            "laquo" => Some("«".to_string()),
+            "raquo" => Some("»".to_string()),
+            "ldquo" => Some("\u{201C}".to_string()), // Left double quotation mark
+            "rdquo" => Some("\u{201D}".to_string()), // Right double quotation mark
+            "lsquo" => Some("\u{2018}".to_string()), // Left single quotation mark
+            "rsquo" => Some("\u{2019}".to_string()), // Right single quotation mark
+
+            // Numeric entities
+            _ if entity.starts_with('#') => self.decode_numeric_entity(&entity[1..]),
+
+            // Unknown entity
+            _ => None,
+        }
+    }
+
+    /// Decode numeric HTML entities (decimal and hexadecimal)
+    fn decode_numeric_entity(&self, num_str: &str) -> Option<String> {
+        if num_str.is_empty() {
+            return None;
+        }
+
+        let code_point = if num_str.starts_with('x') || num_str.starts_with('X') {
+            // Hexadecimal
+            u32::from_str_radix(&num_str[1..], 16).ok()?
+        } else {
+            // Decimal
+            num_str.parse::<u32>().ok()?
+        };
+
+        // Convert to character
+        char::from_u32(code_point).map(|c| c.to_string())
     }
 
     /// Remove CSS styles, script tags, and other non-content elements
@@ -568,5 +672,277 @@ mod tests {
         let cleaned = converter.clean_whitespace_improved(messy_text);
         assert!(!cleaned.contains("    "));
         assert!(!cleaned.contains("\n\n\n"));
+    }
+
+    #[tokio::test]
+    async fn test_html_entities_conversion() {
+        let converter = create_test_converter();
+        let html = r#"<p>Hello&nbsp;world&amp;more&lt;test&gt;"quotes"</p>"#;
+        let result = converter.convert(html).await.unwrap();
+
+        // Should not contain raw HTML entities
+        assert!(!result.contains("&nbsp;"));
+        assert!(!result.contains("&amp;"));
+        assert!(!result.contains("&lt;"));
+        assert!(!result.contains("&gt;"));
+        assert!(!result.contains("&quot;"));
+
+        // Should contain the proper characters
+        assert!(result.contains("Hello world"));
+        assert!(result.contains("&more"));
+        assert!(result.contains("<test>"));
+    }
+
+    #[tokio::test]
+    async fn test_apcoa_email_structure() {
+        let converter = create_test_converter();
+        let html = r#"
+        <table>
+            <tr>
+                <td><h1>Ditt kvitto</h1></td>
+            </tr>
+            <tr>
+                <td>Tack för att du betalade med APCOA FLOW, <span>Test User</span>.</td>
+            </tr>
+            <tr>
+                <td>&nbsp;</td>
+            </tr>
+            <tr>
+                <td>
+                    <table>
+                        <tr>
+                            <td><b>Namn :</b> <span>Test User Name</span></td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+        "#;
+        let result = converter.convert(html).await.unwrap();
+
+        println!("APCOA conversion result: {}", result);
+
+        // Should contain the key text content
+        assert!(result.contains("Ditt kvitto"));
+        assert!(result.contains("Tack för att du betalade"));
+        assert!(result.contains("Test User"));
+        assert!(result.contains("Namn :"));
+        assert!(result.contains("Test User Name"));
+
+        // Should not contain raw HTML entities
+        assert!(!result.contains("&nbsp;"));
+
+        // Should not be empty or just whitespace
+        assert!(!result.trim().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_numeric_html_entities() {
+        let converter = create_test_converter();
+        let html = r#"<p>&#8203;&#32;&#160;&#39;Quote&#8217;</p>"#;
+        let result = converter.convert(html).await.unwrap();
+
+        println!("Numeric entities result: '{}'", result);
+
+        // Should not contain raw numeric entities
+        assert!(!result.contains("&#8203;"));
+        assert!(!result.contains("&#32;"));
+        assert!(!result.contains("&#160;"));
+        assert!(!result.contains("&#39;"));
+        assert!(!result.contains("&#8217;"));
+
+        // Should contain proper characters (spaces and quotes)
+        assert!(result.contains("Quote"));
+    }
+
+    #[tokio::test]
+    async fn test_real_apcoa_email_content() {
+        let converter = create_test_converter();
+
+        // Simplified version of the real APCOA email HTML structure
+        let apcoa_html = r#"
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Payment Success SE</title>
+        </head>
+        <body style="margin: 0; padding: 0;">
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tbody>
+                    <tr>
+                        <td style="padding: 30px 0">
+                            <table width="600" align="center" border="0" cellpadding="0" cellspacing="0">
+                                <tbody>
+                                    <tr>
+                                        <td align="center">
+                                            <img width="200" src="https://example.com/logo.png" alt="Flow Logo" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td align="center" style="font-family: Arial, sans-serif; font-size: 12px; color: #06395b;">
+                                            <h1>Ditt kvitto</h1>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-family: Arial, sans-serif; font-size: 12px; color: #06395b;">
+                                            Tack för att du betalade med APCOA FLOW,
+                                            <span>Test User</span>.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><hr style="border-color: #97979735;" /></td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                                <tbody>
+                                                    <tr>
+                                                        <td>
+                                                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                                                <tbody>
+                                                                    <tr>
+                                                                        <td style="font-family: Arial, sans-serif; font-size: 12px; color: #06395b;">
+                                                                            <b>Namn :</b>
+                                                                            <span>Test User Name</span>
+                                                                        </td>
+                                                                    </tr>
+                                                                </tbody>
+                                                            </table>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                                <tbody>
+                                                    <tr>
+                                                        <td style="font-family: Arial, sans-serif; font-size: 12px; color: #06395b;">
+                                                            <b>Information om din parkering : </b>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td style="font-family: Arial, sans-serif; font-size: 12px; color: #06395b;">
+                                                            <span>Hospital Visitor Parking</span>
+                                                            <span style="background-color: #f1f1f1; padding: 4px;">
+                                                                Zonkod : <span>12345</span>
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="border-top: 1px solid #97979735; margin: 8px 0;">
+                                            &nbsp;
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                                <tbody>
+                                                    <tr>
+                                                        <td style="font-family: Arial, sans-serif; font-size: 12px; color: #06395b; padding-bottom: 15px;">
+                                                            <b>Din parkering :</b>
+                                                            <span>#12345678</span>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </body>
+        </html>
+        "#;
+
+        let result = converter.convert(apcoa_html).await.unwrap();
+
+        println!("=== REAL APCOA EMAIL CONVERSION RESULT ===");
+        println!("{}", result);
+        println!("=== END RESULT (length: {}) ===", result.len());
+
+        // Should contain the main Swedish content
+        assert!(result.contains("Ditt kvitto"));
+        assert!(result.contains("Tack för att du betalade"));
+        assert!(result.contains("Test User"));
+        assert!(result.contains("Namn :"));
+        assert!(result.contains("Test User Name"));
+        assert!(result.contains("Information om din parkering"));
+        assert!(result.contains("Hospital Visitor Parking"));
+        assert!(result.contains("Zonkod"));
+        assert!(result.contains("12345"));
+        assert!(result.contains("Din parkering"));
+        assert!(result.contains("#12345678"));
+
+        // Should not contain raw HTML entities
+        assert!(!result.contains("&nbsp;"));
+
+        // Should not be empty
+        assert!(!result.trim().is_empty());
+        assert!(result.len() > 100); // Should have substantial content
+    }
+
+    #[tokio::test]
+    async fn test_medium_article_with_entities() {
+        let converter = create_test_converter();
+
+        // Simplified version of the Medium article with HTML entities
+        let medium_html = r#"
+        <html lang="en">
+        <head>
+            <title>Why we love puzzles</title>
+        </head>
+        <body>
+            <div>
+                <h2>Why we love puzzles</h2>
+                <h4>Emotion in the age of AI + avoiding cognitive bias while booking summer travel (Issue #345)</h4>
+                <div>
+                    <p>Puzzles aren't just a way to pass time for <a href="https://writeplatform.example/u/b61faf3f1de8">Heidi Erwin</a>; they're her livelihood. As a senior game designer at <em>The New York Times</em>, <a href="http://redirect.medium.systems/r-xyYALjyI6d">she creates the weekly Brain Tickler</a>: a visual riddle or word game that invites lateral thinking.</p>
+                    <p>Inspiration might come from something small or random. One puzzle began when Erwin started noticing bike racks around Queens. Each had a distinct geometric shape, which she transformed into a visual riddle: What item might be seen with all five? The answer — "a bicycle" — only lands if the clues are clear and the connections click.</p>
+                    <p>Whether analog or digital, puzzles require patience and focus. They ask you to notice more, make new connections, and tolerate uncertainty longer than most tasks allow. The pleasure comes from staying with a problem until something clicks.</p>
+                </div>
+                <h3>🤿 Jumping-off quotes</h3>
+                <ul>
+                    <li>"The reduction of emotion to something inconvenient, unproductive, or excessive is not just a cultural shift; it's a design principle. We're living in a world being increasingly built by, for, and through machines that don't feel. And in the process, we're unlearning how to." — <a href="https://writeplatform.example/u/84eb4492fc9d">ashwini asokan</a></li>
+                    <li>"There's a difference between letting feedback shape you and letting it name you. One is formation. The other is fusion. And when we fuse our identity with what others say — good or bad — we become unsteady, living at the mercy of whatever opinions blow through the room."</li>
+                </ul>
+                <p><em>Questions, feedback, or story suggestions? Email us: </em><a href="mailto:user@example.com">user@example.com</a></p>
+            </div>
+        </body>
+        </html>
+        "#;
+
+        let result = converter.convert(medium_html).await.unwrap();
+
+        println!("=== MEDIUM ARTICLE CONVERSION RESULT ===");
+        println!("{}", result);
+        println!("=== END RESULT (length: {}) ===", result.len());
+
+        // Should contain the main content
+        assert!(result.contains("Why we love puzzles"));
+        assert!(result.contains("Emotion in the age of AI"));
+        assert!(result.contains("Heidi Erwin"));
+        assert!(result.contains("The New York Times"));
+        assert!(result.contains("Brain") && result.contains("Tickler"));
+        assert!(result.contains("bike racks around Queens"));
+        assert!(result.contains("Jumping-off quotes"));
+        assert!(result.contains("ashwini") && result.contains("asokan"));
+        assert!(result.contains("user@example.com"));
+
+        // Should handle quotes properly
+        assert!(result.contains("\"a bicycle\""));
+
+        // Should not be empty
+        assert!(!result.trim().is_empty());
+        assert!(result.len() > 200); // Should have substantial content
     }
 }
