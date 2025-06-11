@@ -1,9 +1,11 @@
 use crate::client::NotmuchClient;
+use crate::config::Config;
 use crate::error::NotmuchError;
 use crate::mail_sender::{ComposableMessage, MailSender};
 use crate::search::SearchItem;
-use crate::text_renderer::{HtmlToTextConverter, TextRendererConfig, TextRendererFactory};
+use crate::text_renderer::{HtmlToTextConverter, TextRendererConfig, TextRendererFactory, styled::StyledTextConverter};
 use crate::thread::{Message, Thread};
+use ratatui::text::Text;
 use std::sync::Arc;
 
 #[derive(Debug, Default)]
@@ -69,7 +71,7 @@ pub struct App {
     pub current_email: Option<Message>,
 
     /// Processed email body text (after HTML conversion)
-    pub current_email_body: Option<String>,
+    pub current_email_body: Option<Text<'static>>,
 
     /// Current search query
     pub search_query: String,
@@ -92,6 +94,12 @@ pub struct App {
     /// HTML to text converter
     html_converter: Box<dyn HtmlToTextConverter>,
 
+    /// Whether styled text is enabled
+    styled_text_enabled: bool,
+
+    /// Styled text converter (used when styled_text_enabled is true)
+    styled_converter: Option<StyledTextConverter>,
+
     /// Mail sender for sending emails (optional if not configured)
     mail_sender: Option<Box<dyn MailSender>>,
 }
@@ -100,10 +108,21 @@ impl App {
     pub async fn new(
         client: Arc<dyn NotmuchClient>,
         mail_sender: Option<Box<dyn MailSender>>,
+        config: &Config,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        // Create HTML to text converter with default configuration
-        let config = TextRendererConfig::default();
-        let html_converter = TextRendererFactory::create_converter(&config).await?;
+        // Check if styled text is enabled
+        let styled_text_enabled = config.ui.tui.styled_text.unwrap_or(false);
+        
+        // Create HTML to text converter (always need this for compatibility)
+        let text_config = TextRendererConfig::default();
+        let html_converter = TextRendererFactory::create_converter(&text_config).await?;
+        
+        // Create styled converter if enabled
+        let styled_converter = if styled_text_enabled {
+            Some(StyledTextConverter::new(TextRendererConfig::default()))
+        } else {
+            None
+        };
 
         Ok(Self {
             state: AppState::EmailList,
@@ -121,6 +140,8 @@ impl App {
             compose_form: ComposeForm::default(),
             client,
             html_converter,
+            styled_text_enabled,
+            styled_converter,
             mail_sender,
         })
     }
@@ -219,7 +240,7 @@ impl App {
             let messages = thread.get_messages();
             if let Some(&message) = messages.get(self.current_message_index) {
                 // Process the email body content
-                self.current_email_body = self.process_email_body(message).await;
+                self.current_email_body = self.process_email_body_styled(message).await;
                 self.current_email = Some(message.clone());
                 self.scroll_position = 0; // Reset scroll when switching messages
             }
@@ -388,6 +409,21 @@ impl App {
         Some("[No readable content]".to_string())
     }
 
+    /// Process email body and return styled Text (or plain text converted to Text)
+    pub async fn process_email_body_styled(&self, message: &Message) -> Option<Text<'static>> {
+        if message.body.is_empty() {
+            return Some(Text::from("[No body content]"));
+        }
+
+        // Recursively search for text content in the body parts
+        if let Some(text_content) = self.find_text_content_styled(&message.body).await {
+            return Some(text_content);
+        }
+
+        // If no readable content found
+        Some(Text::from("[No readable content]"))
+    }
+
     /// Recursively search through body parts to find text content
     /// Prefers plain text over HTML, and recursively searches multipart containers
     async fn find_text_content(&self, parts: &[crate::body::BodyPart]) -> Option<String> {
@@ -424,6 +460,78 @@ impl App {
                                     "[HTML conversion failed: {}]\n\n{}",
                                     e, html
                                 ));
+                            }
+                        }
+                    }
+                }
+                // Add nested multipart containers to stack for processing
+                if let crate::body::BodyContent::Multipart(nested_parts) = &part.content {
+                    stack.push(nested_parts);
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Recursively search through body parts to find text content and return styled Text
+    /// Prefers plain text over HTML, and recursively searches multipart containers
+    async fn find_text_content_styled(&self, parts: &[crate::body::BodyPart]) -> Option<Text<'static>> {
+        // Use iterative approach with a stack to avoid async recursion issues
+        let mut stack: Vec<&[crate::body::BodyPart]> = vec![parts];
+
+        // First pass: look for plain text parts (depth-first search)
+        while let Some(current_parts) = stack.pop() {
+            for part in current_parts {
+                if part.content_type.starts_with("text/plain") {
+                    if let crate::body::BodyContent::Text(text) = &part.content {
+                        // Plain text always returns as Text::from (no styling)
+                        return Some(Text::from(text.clone()));
+                    }
+                }
+                // Add nested multipart containers to stack for processing
+                if let crate::body::BodyContent::Multipart(nested_parts) = &part.content {
+                    stack.push(nested_parts);
+                }
+            }
+        }
+
+        // Second pass: look for HTML parts if no plain text found
+        let mut stack: Vec<&[crate::body::BodyPart]> = vec![parts];
+        while let Some(current_parts) = stack.pop() {
+            for part in current_parts {
+                if part.content_type.starts_with("text/html") {
+                    if let crate::body::BodyContent::Text(html) = &part.content {
+                        // Use styled converter if enabled, otherwise fall back to plain
+                        if self.styled_text_enabled {
+                            if let Some(ref styled_converter) = self.styled_converter {
+                                match styled_converter.convert_to_styled_text(html) {
+                                    Ok(styled_text) => return Some(styled_text),
+                                    Err(e) => {
+                                        // Fallback to plain text conversion if styled fails
+                                        match self.html_converter.convert(html).await {
+                                            Ok(converted_text) => return Some(Text::from(converted_text)),
+                                            Err(_) => {
+                                                return Some(Text::from(format!(
+                                                    "[HTML conversion failed: {}]\n\n{}",
+                                                    e, html
+                                                )));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // Convert HTML to plain text using regular converter
+                            match self.html_converter.convert(html).await {
+                                Ok(converted_text) => return Some(Text::from(converted_text)),
+                                Err(e) => {
+                                    // Fallback to showing raw HTML if conversion fails
+                                    return Some(Text::from(format!(
+                                        "[HTML conversion failed: {}]\n\n{}",
+                                        e, html
+                                    )));
+                                }
                             }
                         }
                     }

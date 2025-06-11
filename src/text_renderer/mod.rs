@@ -12,6 +12,7 @@ use tokio::process::Command;
 
 pub mod builtin;
 pub mod external;
+pub mod styled;
 
 /// Configuration for HTML to text conversion
 #[derive(Debug, Clone)]

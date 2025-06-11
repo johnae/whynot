@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut terminal = Terminal::new(backend)?;
 
     // Create app and event handler
-    let mut app = App::new(client, mail_sender).await?;
+    let mut app = App::new(client, mail_sender, &config).await?;
     let event_handler = EventHandler::new(Duration::from_millis(250));
 
     // Initialize the app

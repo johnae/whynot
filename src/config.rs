@@ -86,6 +86,7 @@ pub struct WebConfig {
 pub struct TuiConfig {
     pub keybindings: Option<String>,
     pub show_sidebar: Option<bool>,
+    pub styled_text: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -273,6 +274,7 @@ impl Default for TuiConfig {
         Self {
             keybindings: Some("vim".to_string()),
             show_sidebar: Some(true),
+            styled_text: Some(false), // Default to false for backward compatibility
         }
     }
 }

@@ -92,6 +92,11 @@ keybindings = "vim"
 # Show sidebar with folders/tags
 show_sidebar = true
 
+# Enable styled text rendering for HTML emails in TUI
+# When enabled, HTML formatting like bold, italic, and colors are preserved
+# When disabled, emails are displayed as plain text (default: false)
+styled_text = false
+
 # General application behavior
 [general]
 # Auto-refresh interval in seconds (0 to disable)
