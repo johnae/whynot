@@ -8,8 +8,11 @@ devenv.local.nix
 # pre-commit
 .pre-commit-config.yaml
 
+config.toml
+
 CLAUDE.md
 TODO.md
+ARCHITECTURE.md
 .claude/*
 
 # Added by cargo

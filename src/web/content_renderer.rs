@@ -498,6 +498,7 @@ mod tests {
     use crate::body::BodyPart;
     use crate::common::Headers;
     use crate::thread::Message;
+    use std::collections::HashMap;
 
     #[test]
     fn test_sanitize_html() {
@@ -603,6 +604,7 @@ mod tests {
                 to: "user@example.com".to_string(),
                 date: "2024-01-01".to_string(),
                 reply_to: None,
+                additional: HashMap::new(),
             },
         };
 
@@ -650,6 +652,7 @@ mod tests {
                 to: "user@example.com".to_string(),
                 date: "2024-01-01".to_string(),
                 reply_to: None,
+                additional: HashMap::new(),
             },
         };
 
@@ -714,6 +717,7 @@ mod tests {
                 to: "user@example.com".to_string(),
                 date: "2024-01-01".to_string(),
                 reply_to: None,
+                additional: HashMap::new(),
             },
         };
 

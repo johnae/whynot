@@ -1,4 +1,3 @@
-use serde_json;
 use std::fs;
 use whynot::thread::Thread;
 use whynot::web::content_renderer::render_message_content;
@@ -26,7 +25,7 @@ fn test_problematic_email_files_exist() {
         );
 
         // File should be readable
-        let content = fs::read_to_string(&path).expect(&format!("Should be able to read {}", path));
+        let content = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Should be able to read {}", path));
         assert!(
             !content.is_empty(),
             "Email file {} should not be empty",
@@ -101,15 +100,15 @@ fn test_all_emails_render_successfully() {
 
     for email_name in email_names {
         let path = format!("examples/problematic-emails/{}.json", email_name);
-        let content = fs::read_to_string(&path).expect(&format!("Should read {}", email_name));
+        let content = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Should read {}", email_name));
 
         let thread: Thread =
-            serde_json::from_str(&content).expect(&format!("Should parse {}", email_name));
+            serde_json::from_str(&content).unwrap_or_else(|_| panic!("Should parse {}", email_name));
 
         let messages = thread.get_messages();
         let message = messages
             .first()
-            .expect(&format!("Should have message in {}", email_name));
+            .unwrap_or_else(|| panic!("Should have message in {}", email_name));
 
         // Test rendering doesn't panic
         let rendered = render_message_content(message);
@@ -157,15 +156,15 @@ fn test_email_subject_extraction() {
 
     for (email_name, expected_subject) in expected_subjects {
         let path = format!("examples/problematic-emails/{}.json", email_name);
-        let content = fs::read_to_string(&path).expect(&format!("Should read {}", email_name));
+        let content = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Should read {}", email_name));
 
         let thread: Thread =
-            serde_json::from_str(&content).expect(&format!("Should parse {}", email_name));
+            serde_json::from_str(&content).unwrap_or_else(|_| panic!("Should parse {}", email_name));
 
         let messages = thread.get_messages();
         let message = messages
             .first()
-            .expect(&format!("Should have message in {}", email_name));
+            .unwrap_or_else(|| panic!("Should have message in {}", email_name));
 
         let subject = &message.headers.subject;
 

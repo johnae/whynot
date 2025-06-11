@@ -8,9 +8,15 @@ async fn spawn_test_server() -> (SocketAddr, AppState) {
         bind_address: ([127, 0, 0, 1], 0).into(), // Use port 0 for random port
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
+        auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
+        mail_sender: None,
+        user_config: whynot::config::UserConfig::default(),
         client: std::sync::Arc::from(client),
         config,
     };
@@ -95,9 +101,15 @@ async fn test_inbox_displays_messages() {
         bind_address: ([127, 0, 0, 1], 0).into(),
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
+        auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
+        mail_sender: None,
+        user_config: whynot::config::UserConfig::default(),
         client: std::sync::Arc::from(test_notmuch.client()),
         config,
     };
@@ -359,9 +371,15 @@ async fn test_thread_view_displays_message_content() {
         bind_address: ([127, 0, 0, 1], 0).into(),
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
+        auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
+        mail_sender: None,
+        user_config: whynot::config::UserConfig::default(),
         client: std::sync::Arc::from(test_notmuch.client()),
         config,
     };

@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
-use mail_builder::MessageBuilder;
+use mail_builder::{MessageBuilder, headers::raw::Raw};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct EmailMessage {
@@ -13,6 +14,7 @@ pub struct EmailMessage {
     pub message_id: Option<String>,
     pub in_reply_to: Option<String>,
     pub attachments: Vec<Attachment>,
+    pub additional_headers: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +44,7 @@ impl EmailMessage {
             message_id: None,
             in_reply_to: None,
             attachments: Vec::new(),
+            additional_headers: HashMap::new(),
         }
     }
 
@@ -95,6 +98,11 @@ impl EmailMessage {
 
     pub fn with_in_reply_to(mut self, id: impl Into<String>) -> Self {
         self.in_reply_to = Some(id.into());
+        self
+    }
+
+    pub fn with_additional_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.additional_headers.insert(name.into(), value.into());
         self
     }
 
@@ -240,17 +248,16 @@ impl EmailMessage {
 
     /// Create a newsletter-style multi-column layout
     pub fn with_newsletter_layout(mut self) -> Self {
-        let html = format!(
-            r#"
+        let html = r#"
             <html>
             <head>
                 <style>
-                    .newsletter-container {{ max-width: 600px; margin: 0 auto; font-family: 'Helvetica', Arial, sans-serif; }}
-                    .header {{ background: #2c3e50; color: white; padding: 20px; text-align: center; }}
-                    .two-column {{ display: flex; gap: 20px; padding: 20px; }}
-                    .column {{ flex: 1; background: #f8f9fa; padding: 15px; border-radius: 5px; }}
-                    .highlight-box {{ background: #e74c3c; color: white; padding: 15px; margin: 20px 0; text-align: center; }}
-                    .footer {{ background: #34495e; color: #bdc3c7; padding: 15px; text-align: center; font-size: 12px; }}
+                    .newsletter-container { max-width: 600px; margin: 0 auto; font-family: 'Helvetica', Arial, sans-serif; }
+                    .header { background: #2c3e50; color: white; padding: 20px; text-align: center; }
+                    .two-column { display: flex; gap: 20px; padding: 20px; }
+                    .column { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 5px; }
+                    .highlight-box { background: #e74c3c; color: white; padding: 15px; margin: 20px 0; text-align: center; }
+                    .footer { background: #34495e; color: #bdc3c7; padding: 15px; text-align: center; font-size: 12px; }
                 </style>
             </head>
             <body>
@@ -306,8 +313,7 @@ impl EmailMessage {
                 </div>
             </body>
             </html>
-        "#
-        );
+        "#.to_string();
         self.html_body = Some(html);
         self.body_type = BodyType::Html;
         self
@@ -331,6 +337,11 @@ impl EmailMessage {
 
         if let Some(in_reply_to) = &self.in_reply_to {
             builder = builder.in_reply_to(in_reply_to.clone());
+        }
+
+        // Add custom headers
+        for (name, value) in &self.additional_headers {
+            builder = builder.header(name.clone(), Raw::new(value.clone()));
         }
 
         // Handle different body types

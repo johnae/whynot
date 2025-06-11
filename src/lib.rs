@@ -36,9 +36,13 @@
 pub mod body;
 pub mod client;
 pub mod common;
+pub mod config;
 pub mod error;
+pub mod mail_sender;
 pub mod search;
+pub mod text_renderer;
 pub mod thread;
+pub mod tui;
 pub mod web;
 
 #[cfg(any(test, feature = "test-utils"))]

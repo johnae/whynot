@@ -21,6 +21,23 @@ pub struct Headers {
     pub reply_to: Option<String>,
     #[serde(rename = "Date")]
     pub date: String,
+    #[serde(flatten)]
+    pub additional: HashMap<String, String>,
+}
+
+impl Headers {
+    /// Get a header value by name (case-insensitive).
+    pub fn get(&self, key: &str) -> Option<&String> {
+        let key_lower = key.to_lowercase();
+        match key_lower.as_str() {
+            "subject" => Some(&self.subject),
+            "from" => Some(&self.from),
+            "to" => Some(&self.to),
+            "reply-to" => self.reply_to.as_ref(),
+            "date" => Some(&self.date),
+            _ => self.additional.get(&key_lower),
+        }
+    }
 }
 
 #[cfg(test)]

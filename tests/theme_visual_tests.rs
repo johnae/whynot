@@ -55,7 +55,7 @@ impl ThemeVisualTest {
         for i in 0..20 {
             match self
                 .client
-                .get(&format!("{}/test/email-gallery", SERVER_URL))
+                .get(format!("{}/test/email-gallery", SERVER_URL))
                 .send()
                 .await
             {
@@ -355,7 +355,7 @@ impl ThemeVisualTest {
                 } else {
                     report.push_str("      Issues: None ✅\n");
                 }
-                report.push_str("\n");
+                report.push('\n');
             }
         }
 
@@ -396,9 +396,7 @@ impl ThemeVisualTest {
             report.push_str("• Add CSS variables for theme colors in iframe content\n");
         }
 
-        report.push_str(&format!(
-            "\nScreenshots saved to: target/theme-visual-tests/\n"
-        ));
+        report.push_str(&"\nScreenshots saved to: target/theme-visual-tests/\n".to_string());
 
         report
     }

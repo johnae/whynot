@@ -12,6 +12,10 @@ impl NotmuchClient for MockNotmuchClient {
         Ok(vec![])
     }
 
+    async fn search_paginated(&self, _query: &str, _offset: usize, _limit: usize) -> Result<(Vec<whynot::search::SearchItem>, Option<usize>), NotmuchError> {
+        Ok((vec![], Some(0)))
+    }
+
     async fn show(&self, _query: &str) -> Result<whynot::thread::Thread, NotmuchError> {
         Err(NotmuchError::CommandFailed(
             "Mock client - not implemented".to_string(),
@@ -89,11 +93,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         bind_address: "127.0.0.1:8080".parse().unwrap(),
         base_url: "http://localhost:8080".to_string(),
         items_per_page: 50,
+        auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
         client,
+        mail_sender: None,
         config: config.clone(),
+        user_config: whynot::config::UserConfig::default(),
     };
 
     // Create the application

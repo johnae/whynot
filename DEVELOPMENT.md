@@ -10,8 +10,6 @@ This project aims to create different interfaces for interacting with the notmuc
 
 For current work and todos, please see ./TODO.md
 
-## Development Workflow
-
 ### Test-Driven Development
 
 This project follows a test-driven workflow. For changes where it makes sense, start by creating a test. Do not create any mocks but rather, create a test and run it expecting it to fail. After the tests are in place, go ahead and implement the actual feature, fix or change. Do not change the test(s) to make it pass, unless the test is obviously wrong.
@@ -21,6 +19,27 @@ This project follows a test-driven workflow. For changes where it makes sense, s
 When a piece of functionality is repeated again and again, it could be some id extracting logic for instance, please extract that logic to a function and use that instead. This also enables us to write a test for verifying that the function does what we want it to do while encapsulating the logic itself. For a one-liner though, it may be overkill to extract into a function. It's a balancing act whether to extract the logic or not. If only used in a single place for example, it may be reasonable to not extract the logic into a function if it's only a few lines.
 
 When a new tool or library dependency is needed (not a rust one but something else), please add that dependency to the devenv.nix file.
+
+
+## Configuration Management
+
+Whynot Mail uses a unified configuration system with the following precedence:
+1. CLI arguments (highest priority)
+2. Environment variables (`WHYNOT_*` prefix)
+3. Configuration file (`~/.config/whynot/config.toml`)
+4. Built-in defaults (lowest priority)
+
+**Configuration Development Requirements:**
+
+- **Always update `config.example.toml`** when adding new configuration options
+- Add corresponding CLI arguments with `--option-name` format
+- Add environment variable support with `WHYNOT_OPTION_NAME` format
+- Update the `CliArgs` struct in `src/config.rs` with proper help text
+- Update configuration structs and merging logic as needed
+- Test all three configuration methods (CLI, env vars, config file) work correctly
+
+The example configuration file serves as both documentation and a template for users. It must be kept in sync with all available options.
+
 
 ## Code Quality
 
@@ -133,6 +152,9 @@ devenv shell cargo run --bin whynot-web -- --bind 0.0.0.0:3000
 
 # With logging
 RUST_LOG=whynot=debug devenv shell cargo run --bin whynot-web -- --remote mail.example.com --user username
+
+# With config file
+devenv shell cargo run --bin whynot-web -- --config ./config.toml
 ```
 
 ## Notes

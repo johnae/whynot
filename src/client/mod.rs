@@ -184,6 +184,38 @@ pub trait NotmuchClient: Send + Sync {
     /// ```
     async fn search(&self, query: &str) -> Result<Vec<SearchItem>>;
 
+    /// Search for messages matching a query with pagination support.
+    ///
+    /// This executes `notmuch search --format=json` with the given query string
+    /// and applies offset and limit for pagination.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A notmuch query string (e.g., "tag:inbox", "from:alice")
+    /// * `offset` - Number of results to skip (0-based)
+    /// * `limit` - Maximum number of results to return
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing:
+    /// - Vector of `SearchItem` results for the requested page
+    /// - Total count of matching messages (if available)
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use whynot::client::NotmuchClient;
+    /// # async fn example(client: &dyn NotmuchClient) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Get first 20 unread messages
+    /// let (page, total) = client.search_paginated("tag:unread", 0, 20).await?;
+    ///
+    /// // Get next 20 unread messages
+    /// let (next_page, _) = client.search_paginated("tag:unread", 20, 20).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn search_paginated(&self, query: &str, offset: usize, limit: usize) -> Result<(Vec<SearchItem>, Option<usize>)>;
+
     /// Show messages matching a query in thread format.
     ///
     /// This executes `notmuch show --format=json` with the given query string.

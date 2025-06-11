@@ -13,9 +13,15 @@ async fn spawn_test_server() -> (SocketAddr, AppState) {
         bind_address: ([127, 0, 0, 1], 0).into(),
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
+        auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
+        mail_sender: None,
+        user_config: whynot::config::UserConfig::default(),
         client: std::sync::Arc::from(client),
         config,
     };
@@ -120,9 +126,15 @@ async fn test_thread_view_shows_image_toggle_ui() {
         bind_address: ([127, 0, 0, 1], 0).into(),
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
+        auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
+        mail_sender: None,
+        user_config: whynot::config::UserConfig::default(),
         client: std::sync::Arc::from(test_notmuch.client()),
         config,
     };
@@ -200,9 +212,15 @@ async fn test_email_frame_respects_show_images_parameter() {
         bind_address: ([127, 0, 0, 1], 0).into(),
         base_url: "http://localhost".to_string(),
         items_per_page: 10,
+        auto_refresh_interval: 30,
+        initial_page_size: 20,
+        pagination_size: 10,
+        infinite_scroll_enabled: true,
     };
 
     let state = AppState {
+        mail_sender: None,
+        user_config: whynot::config::UserConfig::default(),
         client: std::sync::Arc::from(test_notmuch.client()),
         config,
     };
