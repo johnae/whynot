@@ -38,18 +38,18 @@
 //! # }
 //! ```
 
-use async_trait::async_trait;
 use crate::error::Result;
 use crate::thread::Message;
+use async_trait::async_trait;
 
 pub mod config;
-pub mod message;
 pub mod local;
+pub mod message;
 pub mod remote;
 
 pub use config::MailSenderConfig;
-pub use message::{ComposableMessage, MessageBuilder};
 pub use local::LocalMsmtpClient;
+pub use message::{ComposableMessage, MessageBuilder};
 pub use remote::RemoteMsmtpClient;
 
 /// A client for sending email messages.
@@ -140,7 +140,12 @@ pub trait MailSender: Send + Sync {
     /// # Ok(())
     /// # }
     /// ```
-    async fn reply(&self, original: &Message, reply: ComposableMessage, reply_all: bool) -> Result<String>;
+    async fn reply(
+        &self,
+        original: &Message,
+        reply: ComposableMessage,
+        reply_all: bool,
+    ) -> Result<String>;
 
     /// Forward an existing email message.
     ///

@@ -12,7 +12,12 @@ impl NotmuchClient for MockNotmuchClient {
         Ok(vec![])
     }
 
-    async fn search_paginated(&self, _query: &str, _offset: usize, _limit: usize) -> Result<(Vec<whynot::search::SearchItem>, Option<usize>), NotmuchError> {
+    async fn search_paginated(
+        &self,
+        _query: &str,
+        _offset: usize,
+        _limit: usize,
+    ) -> Result<(Vec<whynot::search::SearchItem>, Option<usize>), NotmuchError> {
         Ok((vec![], Some(0)))
     }
 

@@ -1,13 +1,13 @@
 use clap::Parser;
 use crossterm::{
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use std::{io, sync::Arc, time::Duration};
 use whynot::{
     client::create_client,
-    config::{Config, CliArgs},
+    config::{CliArgs, Config},
     mail_sender::create_mail_sender,
     tui::{app::App, events::EventHandler, ui},
 };
@@ -17,31 +17,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse CLI arguments and load configuration
     let cli_args = CliArgs::parse();
     let config = Config::load(cli_args)?;
-    
+
     // Create client configuration from unified config
     let client_config = config.to_client_config()?;
-    
+
     // Create the notmuch client
     let client = create_client(client_config)?;
     let client = Arc::from(client) as Arc<dyn whynot::client::NotmuchClient>;
-    
+
     // Create the mail sender (optional if not configured)
     let mail_sender = match config.to_mail_sender_config() {
-        Ok(mail_sender_config) => {
-            match create_mail_sender(mail_sender_config) {
-                Ok(sender) => Some(sender),
-                Err(e) => {
-                    eprintln!("Warning: Mail sending not configured: {}", e);
-                    None
-                }
+        Ok(mail_sender_config) => match create_mail_sender(mail_sender_config) {
+            Ok(sender) => Some(sender),
+            Err(e) => {
+                eprintln!("Warning: Mail sending not configured: {}", e);
+                None
             }
-        }
+        },
         Err(e) => {
             eprintln!("Warning: Mail sending configuration incomplete: {}", e);
             None
         }
     };
-    
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -84,7 +82,7 @@ async fn run_app<B: ratatui::backend::Backend>(
         match event_handler.next()? {
             whynot::tui::Event::Key(key) => {
                 let event = whynot::tui::Event::Key(key);
-                
+
                 // Global quit handling
                 if event.is_quit() {
                     app.quit();
@@ -132,7 +130,10 @@ async fn run_app<B: ratatui::backend::Backend>(
                             }
                         } else if event.is_prev_message() {
                             if let Err(e) = app.prev_message_in_thread().await {
-                                app.set_status(format!("Error navigating to previous message: {}", e));
+                                app.set_status(format!(
+                                    "Error navigating to previous message: {}",
+                                    e
+                                ));
                             }
                         } else if event.is_reply() {
                             app.start_compose_reply(false);
@@ -148,27 +149,25 @@ async fn run_app<B: ratatui::backend::Backend>(
                         // Any key closes help
                         app.go_back();
                     }
-                    whynot::tui::app::AppState::Search => {
-                        match key.code {
-                            crossterm::event::KeyCode::Esc => {
-                                app.go_back();
-                            }
-                            crossterm::event::KeyCode::Enter => {
-                                if let Err(e) = app.execute_search().await {
-                                    app.set_status(format!("Search error: {}", e));
-                                } else {
-                                    app.set_status(format!("Search results for: {}", app.search_query));
-                                }
-                            }
-                            crossterm::event::KeyCode::Backspace => {
-                                app.handle_search_backspace();
-                            }
-                            crossterm::event::KeyCode::Char(c) => {
-                                app.handle_search_char(c);
-                            }
-                            _ => {}
+                    whynot::tui::app::AppState::Search => match key.code {
+                        crossterm::event::KeyCode::Esc => {
+                            app.go_back();
                         }
-                    }
+                        crossterm::event::KeyCode::Enter => {
+                            if let Err(e) = app.execute_search().await {
+                                app.set_status(format!("Search error: {}", e));
+                            } else {
+                                app.set_status(format!("Search results for: {}", app.search_query));
+                            }
+                        }
+                        crossterm::event::KeyCode::Backspace => {
+                            app.handle_search_backspace();
+                        }
+                        crossterm::event::KeyCode::Char(c) => {
+                            app.handle_search_char(c);
+                        }
+                        _ => {}
+                    },
                     whynot::tui::app::AppState::Compose => {
                         match key.code {
                             crossterm::event::KeyCode::Esc => {
@@ -184,7 +183,11 @@ async fn run_app<B: ratatui::backend::Backend>(
                                 // Handle Enter key in compose mode
                                 app.compose_handle_enter();
                             }
-                            crossterm::event::KeyCode::Char('s') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                            crossterm::event::KeyCode::Char('s')
+                                if key
+                                    .modifiers
+                                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                            {
                                 if let Err(e) = app.send_composed_email().await {
                                     app.set_status(format!("Send error: {}", e));
                                 }

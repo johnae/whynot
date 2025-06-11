@@ -6,7 +6,7 @@ use std::process::Stdio;
 use tokio::process::Command;
 
 use crate::error::{NotmuchError, Result};
-use crate::mail_sender::{MailSender, MailSenderConfig, ComposableMessage};
+use crate::mail_sender::{ComposableMessage, MailSender, MailSenderConfig};
 use crate::thread::Message;
 
 /// A mail sender that executes msmtp commands on a remote host via SSH.
@@ -126,21 +126,25 @@ impl RemoteMsmtpClient {
 
         // Build the msmtp command
         let mut msmtp_cmd_parts = vec![self.msmtp_path.to_string_lossy().to_string()];
-        
+
         // Add config file if specified
         if let Some(config_path) = &self.config_path {
             msmtp_cmd_parts.push("--file".to_string());
             msmtp_cmd_parts.push(config_path.to_string_lossy().to_string());
         }
-        
+
         // Add msmtp arguments
         msmtp_cmd_parts.extend(msmtp_args.iter().map(|s| s.to_string()));
-        
+
         let msmtp_cmd = msmtp_cmd_parts.join(" ");
         ssh_args.push(msmtp_cmd.clone());
 
         // Log the command being executed
-        tracing::debug!("Executing SSH msmtp command to {}: {}", connection, msmtp_cmd);
+        tracing::debug!(
+            "Executing SSH msmtp command to {}: {}",
+            connection,
+            msmtp_cmd
+        );
 
         let mut child = Command::new("ssh")
             .args(&ssh_args)
@@ -220,21 +224,25 @@ impl RemoteMsmtpClient {
 
         // Build the msmtp command
         let mut msmtp_cmd_parts = vec![self.msmtp_path.to_string_lossy().to_string()];
-        
+
         // Add config file if specified
         if let Some(config_path) = &self.config_path {
             msmtp_cmd_parts.push("--file".to_string());
             msmtp_cmd_parts.push(config_path.to_string_lossy().to_string());
         }
-        
+
         // Add msmtp arguments
         msmtp_cmd_parts.extend(msmtp_args.iter().map(|s| s.to_string()));
-        
+
         let msmtp_cmd = msmtp_cmd_parts.join(" ");
         ssh_args.push(msmtp_cmd.clone());
 
         // Log the command being executed
-        tracing::debug!("Executing SSH msmtp info command to {}: {}", connection, msmtp_cmd);
+        tracing::debug!(
+            "Executing SSH msmtp info command to {}: {}",
+            connection,
+            msmtp_cmd
+        );
 
         let output = Command::new("ssh")
             .args(&ssh_args)
@@ -247,7 +255,10 @@ impl RemoteMsmtpClient {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
-            tracing::error!("SSH msmtp info command failed with status: {:?}", output.status);
+            tracing::error!(
+                "SSH msmtp info command failed with status: {:?}",
+                output.status
+            );
             tracing::error!("SSH stderr: {}", stderr);
             tracing::error!("SSH stdout: {}", stdout);
             return Err(NotmuchError::SshError(format!(
@@ -270,31 +281,36 @@ impl RemoteMsmtpClient {
 impl MailSender for RemoteMsmtpClient {
     async fn send(&self, message: ComposableMessage) -> Result<String> {
         let rfc822_data = message.to_rfc822()?;
-        
+
         // Build recipient list for msmtp
         let mut recipients = message.to.clone();
         recipients.extend(message.cc.clone());
         recipients.extend(message.bcc.clone());
-        
+
         let mut args = vec![];
         for recipient in &recipients {
             args.push(recipient.as_str());
         }
-        
+
         self.execute_ssh_msmtp_command(&args, &rfc822_data).await?;
         Ok(message.message_id)
     }
 
-    async fn reply(&self, original: &Message, reply: ComposableMessage, reply_all: bool) -> Result<String> {
+    async fn reply(
+        &self,
+        original: &Message,
+        reply: ComposableMessage,
+        reply_all: bool,
+    ) -> Result<String> {
         let mut full_reply = ComposableMessage::reply_builder(original, reply_all)
             .body(reply.body.clone())
             .build()?;
-        
+
         // Merge in any additional fields from the reply
         if let Some(from) = reply.from {
             full_reply.from = Some(from);
         }
-        
+
         self.send(full_reply).await
     }
 
@@ -302,29 +318,32 @@ impl MailSender for RemoteMsmtpClient {
         let mut full_forward = ComposableMessage::forward_builder(original)
             .body(forward.body.clone())
             .build()?;
-        
+
         // Merge in recipients from forward
         full_forward.to = forward.to;
         full_forward.cc = forward.cc;
         full_forward.bcc = forward.bcc;
-        
+
         if let Some(from) = forward.from {
             full_forward.from = Some(from);
         }
-        
+
         self.send(full_forward).await
     }
 
     async fn test_connection(&self) -> Result<()> {
         // Test msmtp configuration with --serverinfo flag
-        self.execute_ssh_msmtp_info_command(&["--serverinfo"]).await?;
+        self.execute_ssh_msmtp_info_command(&["--serverinfo"])
+            .await?;
         Ok(())
     }
 
     async fn get_from_address(&self) -> Result<String> {
         // Get the default from address from msmtp config
-        let config_output = self.execute_ssh_msmtp_info_command(&["--print-config"]).await?;
-        
+        let config_output = self
+            .execute_ssh_msmtp_info_command(&["--print-config"])
+            .await?;
+
         // Parse the config output to find the from address
         for line in config_output.lines() {
             if line.starts_with("from") {
@@ -363,7 +382,10 @@ mod tests {
         assert_eq!(client.user, Some("testuser".to_string()));
         assert_eq!(client.port, Some(2222));
         assert_eq!(client.msmtp_path, PathBuf::from("/usr/local/bin/msmtp"));
-        assert_eq!(client.config_path, Some(PathBuf::from("/home/user/.msmtprc")));
+        assert_eq!(
+            client.config_path,
+            Some(PathBuf::from("/home/user/.msmtprc"))
+        );
     }
 
     #[test]

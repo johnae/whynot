@@ -1,9 +1,9 @@
 use crate::client::NotmuchClient;
 use crate::error::NotmuchError;
+use crate::mail_sender::{ComposableMessage, MailSender};
 use crate::search::SearchItem;
-use crate::thread::{Message, Thread};
 use crate::text_renderer::{HtmlToTextConverter, TextRendererConfig, TextRendererFactory};
-use crate::mail_sender::{MailSender, ComposableMessage};
+use crate::thread::{Message, Thread};
 use std::sync::Arc;
 
 #[derive(Debug, Default)]
@@ -20,9 +20,9 @@ pub enum AppState {
 pub enum ComposeMode {
     #[default]
     New,
-    Reply(String), // Thread ID
+    Reply(String),    // Thread ID
     ReplyAll(String), // Thread ID
-    Forward(String), // Thread ID
+    Forward(String),  // Thread ID
 }
 
 #[derive(Debug, Default)]
@@ -49,59 +49,62 @@ pub struct ComposeForm {
 pub struct App {
     /// Current application state
     pub state: AppState,
-    
+
     /// Should the application quit?
     pub should_quit: bool,
-    
+
     /// Current search results/email list
     pub search_results: Vec<SearchItem>,
-    
+
     /// Currently selected email index
     pub selected_email: usize,
-    
+
     /// Current thread being viewed (if in EmailView state)
     pub current_thread: Option<Thread>,
-    
+
     /// Index of current message within the thread
     pub current_message_index: usize,
-    
+
     /// Current email being viewed (if in EmailView state)
     pub current_email: Option<Message>,
-    
+
     /// Processed email body text (after HTML conversion)
     pub current_email_body: Option<String>,
-    
+
     /// Current search query
     pub search_query: String,
-    
+
     /// Search input buffer (for typing)
     pub search_input: String,
-    
+
     /// Scroll position in various views
     pub scroll_position: usize,
-    
+
     /// Status message to display
     pub status_message: Option<String>,
-    
+
     /// Compose form data
     pub compose_form: ComposeForm,
-    
+
     /// Notmuch client for data access
     client: Arc<dyn NotmuchClient>,
-    
+
     /// HTML to text converter
     html_converter: Box<dyn HtmlToTextConverter>,
-    
+
     /// Mail sender for sending emails (optional if not configured)
     mail_sender: Option<Box<dyn MailSender>>,
 }
 
 impl App {
-    pub async fn new(client: Arc<dyn NotmuchClient>, mail_sender: Option<Box<dyn MailSender>>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(
+        client: Arc<dyn NotmuchClient>,
+        mail_sender: Option<Box<dyn MailSender>>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         // Create HTML to text converter with default configuration
         let config = TextRendererConfig::default();
         let html_converter = TextRendererFactory::create_converter(&config).await?;
-        
+
         Ok(Self {
             state: AppState::EmailList,
             should_quit: false,
@@ -196,14 +199,14 @@ impl App {
         if let Some(search_item) = self.search_results.get(self.selected_email) {
             // Load the full thread to get all messages
             let thread = self.client.show(&search_item.thread).await?;
-            
+
             // Store the thread and start with the first message
             self.current_thread = Some(thread);
             self.current_message_index = 0;
-            
+
             // Load the first message
             self.load_current_message().await?;
-                
+
             self.state = AppState::EmailView;
             self.scroll_position = 0;
         }
@@ -236,15 +239,19 @@ impl App {
         if can_advance {
             self.current_message_index += 1;
             self.load_current_message().await?;
-            
+
             // Get message count for status
-            let message_count = self.current_thread.as_ref()
+            let message_count = self
+                .current_thread
+                .as_ref()
                 .map(|t| t.get_messages().len())
                 .unwrap_or(0);
-            
-            self.set_status(format!("Message {}/{}", 
-                self.current_message_index + 1, 
-                message_count));
+
+            self.set_status(format!(
+                "Message {}/{}",
+                self.current_message_index + 1,
+                message_count
+            ));
         } else if self.current_thread.is_some() {
             self.set_status("At last message in thread".to_string());
         }
@@ -258,15 +265,19 @@ impl App {
         if can_go_back {
             self.current_message_index -= 1;
             self.load_current_message().await?;
-            
+
             // Get message count for status
-            let message_count = self.current_thread.as_ref()
+            let message_count = self
+                .current_thread
+                .as_ref()
                 .map(|t| t.get_messages().len())
                 .unwrap_or(0);
-            
-            self.set_status(format!("Message {}/{}", 
-                self.current_message_index + 1, 
-                message_count));
+
+            self.set_status(format!(
+                "Message {}/{}",
+                self.current_message_index + 1,
+                message_count
+            ));
         } else if self.current_thread.is_some() {
             self.set_status("At first message in thread".to_string());
         }
@@ -278,9 +289,11 @@ impl App {
         if let Some(ref thread) = self.current_thread {
             let messages = thread.get_messages();
             if messages.len() > 1 {
-                Some(format!("Thread: Message {}/{}", 
-                    self.current_message_index + 1, 
-                    messages.len()))
+                Some(format!(
+                    "Thread: Message {}/{}",
+                    self.current_message_index + 1,
+                    messages.len()
+                ))
             } else {
                 None
             }
@@ -342,12 +355,12 @@ impl App {
     pub fn handle_search_char(&mut self, c: char) {
         self.search_input.push(c);
     }
-    
+
     /// Handle backspace in search mode
     pub fn handle_search_backspace(&mut self) {
         self.search_input.pop();
     }
-    
+
     /// Execute the search based on current input
     pub async fn execute_search(&mut self) -> Result<(), NotmuchError> {
         if !self.search_input.is_empty() {
@@ -359,7 +372,7 @@ impl App {
         }
         Ok(())
     }
-    
+
     /// Process email body content, converting HTML to text if needed
     pub async fn process_email_body(&self, message: &Message) -> Option<String> {
         if message.body.is_empty() {
@@ -367,12 +380,22 @@ impl App {
         }
 
         // First try to find a plain text part
-        if let Some(text_part) = message.body.iter().find(|part| part.content_type.starts_with("text/plain")) {
-            if let crate::body::BodyContent::Text(text) = &text_part.content { return Some(text.clone()) }
+        if let Some(text_part) = message
+            .body
+            .iter()
+            .find(|part| part.content_type.starts_with("text/plain"))
+        {
+            if let crate::body::BodyContent::Text(text) = &text_part.content {
+                return Some(text.clone());
+            }
         }
 
         // If no plain text, try to convert HTML to text
-        if let Some(html_part) = message.body.iter().find(|part| part.content_type.starts_with("text/html")) {
+        if let Some(html_part) = message
+            .body
+            .iter()
+            .find(|part| part.content_type.starts_with("text/html"))
+        {
             if let crate::body::BodyContent::Text(html) = &html_part.content {
                 // Convert HTML to text using our text renderer
                 match self.html_converter.convert(html).await {
@@ -395,7 +418,7 @@ impl App {
             self.set_status("Mail sending not configured".to_string());
             return;
         }
-        
+
         self.compose_form = ComposeForm {
             mode: ComposeMode::New,
             ..Default::default()
@@ -419,10 +442,27 @@ impl App {
             };
 
             // Pre-populate reply fields
-            let subject = if current_email.headers.subject.starts_with("Re: ") {
-                current_email.headers.subject.clone()
+            let subject = if current_email
+                .headers
+                .subject
+                .as_deref()
+                .unwrap_or("")
+                .starts_with("Re: ")
+            {
+                current_email
+                    .headers
+                    .subject
+                    .clone()
+                    .unwrap_or("(No subject)".to_string())
             } else {
-                format!("Re: {}", current_email.headers.subject)
+                format!(
+                    "Re: {}",
+                    current_email
+                        .headers
+                        .subject
+                        .as_deref()
+                        .unwrap_or("(No subject)")
+                )
             };
 
             self.compose_form = ComposeForm {
@@ -446,10 +486,27 @@ impl App {
 
         if let Some(current_email) = &self.current_email {
             let thread_id = current_email.id.clone();
-            let subject = if current_email.headers.subject.starts_with("Fwd: ") {
-                current_email.headers.subject.clone()
+            let subject = if current_email
+                .headers
+                .subject
+                .as_deref()
+                .unwrap_or("")
+                .starts_with("Fwd: ")
+            {
+                current_email
+                    .headers
+                    .subject
+                    .clone()
+                    .unwrap_or("(No subject)".to_string())
             } else {
-                format!("Fwd: {}", current_email.headers.subject)
+                format!(
+                    "Fwd: {}",
+                    current_email
+                        .headers
+                        .subject
+                        .as_deref()
+                        .unwrap_or("(No subject)")
+                )
             };
 
             self.compose_form = ComposeForm {
@@ -513,11 +570,21 @@ impl App {
     /// Handle backspace in compose mode
     pub fn compose_handle_backspace(&mut self) {
         match self.compose_form.current_field {
-            ComposeField::To => { self.compose_form.to.pop(); }
-            ComposeField::Cc => { self.compose_form.cc.pop(); }
-            ComposeField::Bcc => { self.compose_form.bcc.pop(); }
-            ComposeField::Subject => { self.compose_form.subject.pop(); }
-            ComposeField::Body => { self.compose_form.body.pop(); }
+            ComposeField::To => {
+                self.compose_form.to.pop();
+            }
+            ComposeField::Cc => {
+                self.compose_form.cc.pop();
+            }
+            ComposeField::Bcc => {
+                self.compose_form.bcc.pop();
+            }
+            ComposeField::Subject => {
+                self.compose_form.subject.pop();
+            }
+            ComposeField::Body => {
+                self.compose_form.body.pop();
+            }
         }
     }
 
@@ -526,7 +593,9 @@ impl App {
         if let Some(ref mail_sender) = self.mail_sender {
             // Validate required fields
             if self.compose_form.to.trim().is_empty() {
-                return Err(NotmuchError::ConfigError("To field is required".to_string()));
+                return Err(NotmuchError::ConfigError(
+                    "To field is required".to_string(),
+                ));
             }
 
             match &self.compose_form.mode {
@@ -546,32 +615,43 @@ impl App {
                         builder = builder.bcc(bcc_email);
                     }
 
-                    let message = builder.build()
-                        .map_err(|e| NotmuchError::ConfigError(format!("Failed to build message: {}", e)))?;
+                    let message = builder.build().map_err(|e| {
+                        NotmuchError::ConfigError(format!("Failed to build message: {}", e))
+                    })?;
 
-                    let _message_id = mail_sender.send(message).await
-                        .map_err(|e| NotmuchError::MailSendError(format!("Failed to send message: {}", e)))?;
-                    
+                    let _message_id = mail_sender.send(message).await.map_err(|e| {
+                        NotmuchError::MailSendError(format!("Failed to send message: {}", e))
+                    })?;
+
                     self.set_status("Email sent successfully".to_string());
                 }
                 ComposeMode::Reply(thread_id) | ComposeMode::ReplyAll(thread_id) => {
                     // Get the original message for reply
                     let thread = self.client.show(thread_id).await?;
                     if let Some(original_message) = thread.get_messages().into_iter().next() {
-                        let is_reply_all = matches!(self.compose_form.mode, ComposeMode::ReplyAll(_));
-                        
+                        let is_reply_all =
+                            matches!(self.compose_form.mode, ComposeMode::ReplyAll(_));
+
                         let reply = ComposableMessage::builder()
                             .to("dummy@example.com".to_string()) // Will be replaced by reply builder
                             .body(self.compose_form.body.clone())
                             .build()
-                            .map_err(|e| NotmuchError::ConfigError(format!("Failed to build reply: {}", e)))?;
+                            .map_err(|e| {
+                                NotmuchError::ConfigError(format!("Failed to build reply: {}", e))
+                            })?;
 
-                        let _message_id = mail_sender.reply(original_message, reply, is_reply_all).await
-                            .map_err(|e| NotmuchError::MailSendError(format!("Failed to send reply: {}", e)))?;
-                        
+                        let _message_id = mail_sender
+                            .reply(original_message, reply, is_reply_all)
+                            .await
+                            .map_err(|e| {
+                                NotmuchError::MailSendError(format!("Failed to send reply: {}", e))
+                            })?;
+
                         self.set_status("Reply sent successfully".to_string());
                     } else {
-                        return Err(NotmuchError::ConfigError("Original message not found".to_string()));
+                        return Err(NotmuchError::ConfigError(
+                            "Original message not found".to_string(),
+                        ));
                     }
                 }
                 ComposeMode::Forward(thread_id) => {
@@ -592,15 +672,25 @@ impl App {
                             builder = builder.bcc(bcc_email);
                         }
 
-                        let forward = builder.build()
-                            .map_err(|e| NotmuchError::ConfigError(format!("Failed to build forward: {}", e)))?;
+                        let forward = builder.build().map_err(|e| {
+                            NotmuchError::ConfigError(format!("Failed to build forward: {}", e))
+                        })?;
 
-                        let _message_id = mail_sender.forward(original_message, forward).await
-                            .map_err(|e| NotmuchError::MailSendError(format!("Failed to send forward: {}", e)))?;
-                        
+                        let _message_id = mail_sender
+                            .forward(original_message, forward)
+                            .await
+                            .map_err(|e| {
+                                NotmuchError::MailSendError(format!(
+                                    "Failed to send forward: {}",
+                                    e
+                                ))
+                            })?;
+
                         self.set_status("Email forwarded successfully".to_string());
                     } else {
-                        return Err(NotmuchError::ConfigError("Original message not found".to_string()));
+                        return Err(NotmuchError::ConfigError(
+                            "Original message not found".to_string(),
+                        ));
                     }
                 }
             }
@@ -609,7 +699,9 @@ impl App {
             self.state = AppState::EmailList;
             self.compose_form = ComposeForm::default();
         } else {
-            return Err(NotmuchError::ConfigError("Mail sender not configured".to_string()));
+            return Err(NotmuchError::ConfigError(
+                "Mail sender not configured".to_string(),
+            ));
         }
 
         Ok(())
@@ -617,7 +709,8 @@ impl App {
 
     /// Helper method to parse comma-separated email list
     fn parse_email_list(&self, input: &str) -> Vec<String> {
-        input.split(',')
+        input
+            .split(',')
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect()

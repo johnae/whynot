@@ -134,34 +134,37 @@ impl NotmuchClient for LocalClient {
         Ok(result.0)
     }
 
-    async fn search_paginated(&self, query: &str, offset: usize, limit: usize) -> Result<(Vec<SearchItem>, Option<usize>)> {
+    async fn search_paginated(
+        &self,
+        query: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<SearchItem>, Option<usize>)> {
         // For pagination, we need to use notmuch's --offset and --limit flags
         let offset_str = offset.to_string();
         let limit_str = limit.to_string();
-        
+
         let output = self
             .execute_command(&[
-                "search", 
-                "--format=json", 
-                "--offset", 
+                "search",
+                "--format=json",
+                "--offset",
                 &offset_str,
                 "--limit",
                 &limit_str,
-                query
+                query,
             ])
             .await?;
-        
+
         let result: SearchResult = serde_json::from_str(&output)?;
-        
+
         // Get total count by running a count command (separate query)
         // This is optional since it requires an extra query
         let total_count = match self.execute_command(&["count", query]).await {
-            Ok(count_output) => {
-                count_output.trim().parse::<usize>().ok()
-            }
+            Ok(count_output) => count_output.trim().parse::<usize>().ok(),
             Err(_) => None, // If count fails, continue without total count
         };
-        
+
         Ok((result.0, total_count))
     }
 

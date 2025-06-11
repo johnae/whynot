@@ -25,7 +25,8 @@ fn test_problematic_email_files_exist() {
         );
 
         // File should be readable
-        let content = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Should be able to read {}", path));
+        let content =
+            fs::read_to_string(&path).unwrap_or_else(|_| panic!("Should be able to read {}", path));
         assert!(
             !content.is_empty(),
             "Email file {} should not be empty",
@@ -100,10 +101,11 @@ fn test_all_emails_render_successfully() {
 
     for email_name in email_names {
         let path = format!("examples/problematic-emails/{}.json", email_name);
-        let content = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Should read {}", email_name));
+        let content =
+            fs::read_to_string(&path).unwrap_or_else(|_| panic!("Should read {}", email_name));
 
-        let thread: Thread =
-            serde_json::from_str(&content).unwrap_or_else(|_| panic!("Should parse {}", email_name));
+        let thread: Thread = serde_json::from_str(&content)
+            .unwrap_or_else(|_| panic!("Should parse {}", email_name));
 
         let messages = thread.get_messages();
         let message = messages
@@ -156,10 +158,11 @@ fn test_email_subject_extraction() {
 
     for (email_name, expected_subject) in expected_subjects {
         let path = format!("examples/problematic-emails/{}.json", email_name);
-        let content = fs::read_to_string(&path).unwrap_or_else(|_| panic!("Should read {}", email_name));
+        let content =
+            fs::read_to_string(&path).unwrap_or_else(|_| panic!("Should read {}", email_name));
 
-        let thread: Thread =
-            serde_json::from_str(&content).unwrap_or_else(|_| panic!("Should parse {}", email_name));
+        let thread: Thread = serde_json::from_str(&content)
+            .unwrap_or_else(|_| panic!("Should parse {}", email_name));
 
         let messages = thread.get_messages();
         let message = messages
@@ -170,16 +173,22 @@ fn test_email_subject_extraction() {
 
         // Check if subject contains the expected text (partial match since full subjects may vary)
         assert!(
-            subject.contains(expected_subject)
+            subject.as_deref().unwrap_or("").contains(expected_subject)
                 || subject
+                    .as_deref()
+                    .unwrap_or("")
                     .to_lowercase()
                     .contains(&expected_subject.to_lowercase()),
             "Subject in {} should contain '{}', but got '{}'",
             email_name,
             expected_subject,
-            subject
+            subject.as_deref().unwrap_or("(No subject)")
         );
 
-        println!("✓ {} has subject: '{}'", email_name, subject);
+        println!(
+            "✓ {} has subject: '{}'",
+            email_name,
+            subject.as_deref().unwrap_or("(No subject)")
+        );
     }
 }

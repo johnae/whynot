@@ -326,7 +326,7 @@ async fn test_web_thread_view_content_display() {
         assert!(
             rendered.has_html() || rendered.has_plain(),
             "Message '{}' should have either HTML or plain content",
-            message.headers.subject
+            message.headers.subject.as_deref().unwrap_or("(No subject)")
         );
 
         // If it has HTML, it should be sanitized

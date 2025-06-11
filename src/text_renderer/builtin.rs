@@ -1,5 +1,5 @@
 //! Built-in HTML to text converter implementation
-//! 
+//!
 //! This module provides a native Rust implementation for converting HTML to
 //! readable plain text suitable for terminal display.
 
@@ -16,25 +16,25 @@ impl BuiltinConverter {
     pub fn new(config: TextRendererConfig) -> Self {
         Self { config }
     }
-    
+
     /// Convert HTML to plain text using improved text extraction
     /// This implementation handles CSS removal, better formatting, and structure preservation
     fn convert_html_to_text(&self, html: &str) -> TextRendererResult<String> {
         // Remove CSS styles and script content first
         let cleaned_html = self.remove_css_and_scripts(html);
-        
+
         // Strip HTML tags with better structure handling
         let text = self.strip_html_tags_improved(&cleaned_html);
-        
+
         // Clean up whitespace more aggressively
         let cleaned = self.clean_whitespace_improved(&text);
-        
+
         // Wrap text to configured width
         let wrapped = self.wrap_text(&cleaned);
-        
+
         Ok(wrapped)
     }
-    
+
     /// Remove CSS styles, script tags, and other non-content elements
     fn remove_css_and_scripts(&self, html: &str) -> String {
         let mut result = String::new();
@@ -43,13 +43,13 @@ impl BuiltinConverter {
         let mut in_script_tag = false;
         let mut in_tag = false;
         let mut current_tag = String::new();
-        
+
         while let Some(ch) = chars.next() {
             match ch {
                 '<' => {
                     in_tag = true;
                     current_tag.clear();
-                    
+
                     // Look ahead to see if this is a style or script tag
                     let mut lookahead = String::new();
                     let mut temp_chars = chars.clone();
@@ -61,7 +61,7 @@ impl BuiltinConverter {
                             }
                         }
                     }
-                    
+
                     let lookahead_lower = lookahead.to_lowercase();
                     if lookahead_lower.starts_with("style") {
                         in_style_tag = true;
@@ -86,7 +86,7 @@ impl BuiltinConverter {
                         }
                         continue;
                     }
-                    
+
                     if !in_style_tag && !in_script_tag {
                         result.push(ch);
                     }
@@ -101,18 +101,18 @@ impl BuiltinConverter {
                     if in_tag {
                         current_tag.push(ch);
                     }
-                    
+
                     if !in_style_tag && !in_script_tag {
                         result.push(ch);
                     }
                 }
             }
         }
-        
+
         // Remove inline style attributes
         self.remove_inline_styles(&result)
     }
-    
+
     /// Remove inline style attributes from HTML
     fn remove_inline_styles(&self, html: &str) -> String {
         let mut result = String::new();
@@ -120,7 +120,7 @@ impl BuiltinConverter {
         let mut in_tag = false;
         let mut in_style_attr = false;
         let mut quote_char: Option<char> = None;
-        
+
         while let Some(ch) = chars.next() {
             match ch {
                 '<' => {
@@ -147,7 +147,7 @@ impl BuiltinConverter {
                                 }
                             }
                         }
-                        
+
                         if lookahead.to_lowercase().starts_with("style=") {
                             in_style_attr = true;
                             // Skip the "style=" part
@@ -164,7 +164,7 @@ impl BuiltinConverter {
                             continue;
                         }
                     }
-                    
+
                     if in_style_attr {
                         // Skip everything until we close the style attribute
                         if let Some(q) = quote_char {
@@ -184,21 +184,21 @@ impl BuiltinConverter {
                 }
             }
         }
-        
+
         result
     }
-    
+
     /// Improved HTML tag stripping with better structure handling
     fn strip_html_tags_improved(&self, html: &str) -> String {
         let mut result = String::new();
         let mut in_tag = false;
         let mut chars = html.chars().peekable();
-        
+
         while let Some(ch) = chars.next() {
             match ch {
                 '<' => {
                     in_tag = true;
-                    
+
                     // Look ahead to handle specific tags for better formatting
                     let mut lookahead = String::new();
                     let mut temp_chars = chars.clone();
@@ -210,7 +210,7 @@ impl BuiltinConverter {
                             }
                         }
                     }
-                    
+
                     // Add appropriate spacing for different tags
                     match lookahead.as_str() {
                         tag if tag.starts_with("br") || tag.starts_with("br/") => {
@@ -222,14 +222,22 @@ impl BuiltinConverter {
                         tag if tag.starts_with("div") || tag.starts_with("/div") => {
                             result.push('\n');
                         }
-                        tag if tag.starts_with("h1") || tag.starts_with("h2") || 
-                               tag.starts_with("h3") || tag.starts_with("h4") ||
-                               tag.starts_with("h5") || tag.starts_with("h6") => {
+                        tag if tag.starts_with("h1")
+                            || tag.starts_with("h2")
+                            || tag.starts_with("h3")
+                            || tag.starts_with("h4")
+                            || tag.starts_with("h5")
+                            || tag.starts_with("h6") =>
+                        {
                             result.push_str("\n\n");
                         }
-                        tag if tag.starts_with("/h1") || tag.starts_with("/h2") || 
-                               tag.starts_with("/h3") || tag.starts_with("/h4") ||
-                               tag.starts_with("/h5") || tag.starts_with("/h6") => {
+                        tag if tag.starts_with("/h1")
+                            || tag.starts_with("/h2")
+                            || tag.starts_with("/h3")
+                            || tag.starts_with("/h4")
+                            || tag.starts_with("/h5")
+                            || tag.starts_with("/h6") =>
+                        {
                             result.push_str("\n\n");
                         }
                         tag if tag.starts_with("li") => {
@@ -256,16 +264,16 @@ impl BuiltinConverter {
                 _ => {} // Skip characters inside tags
             }
         }
-        
+
         result
     }
-    
+
     /// Improved whitespace cleanup
     fn clean_whitespace_improved(&self, text: &str) -> String {
         let mut result = String::new();
         let mut prev_was_space = false;
         let mut consecutive_newlines = 0;
-        
+
         for ch in text.chars() {
             match ch {
                 '\n' => {
@@ -288,23 +296,22 @@ impl BuiltinConverter {
                 }
             }
         }
-        
+
         // Remove leading/trailing whitespace and normalize line endings
         result.trim().replace("\n ", "\n").replace(" \n", "\n")
     }
-    
-    
+
     /// Wrap text to the configured width with improved handling
     fn wrap_text(&self, text: &str) -> String {
         let mut result = String::new();
-        
+
         for line in text.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() {
                 result.push('\n');
                 continue;
             }
-            
+
             // Handle special formatting prefixes
             if trimmed.starts_with('•') || trimmed.starts_with('>') {
                 let wrapped_line = self.wrap_line_with_prefix(trimmed, self.config.text_width);
@@ -315,16 +322,16 @@ impl BuiltinConverter {
             }
             result.push('\n');
         }
-        
+
         result
     }
-    
+
     /// Wrap a line that has a special prefix (like bullet points or quotes)
     fn wrap_line_with_prefix(&self, line: &str, width: usize) -> String {
         if line.len() <= width {
             return line.to_string();
         }
-        
+
         let prefix = if line.starts_with('•') {
             "• "
         } else if line.starts_with('>') {
@@ -332,19 +339,19 @@ impl BuiltinConverter {
         } else {
             ""
         };
-        
+
         let content = if !prefix.is_empty() {
             &line[prefix.len()..]
         } else {
             line
         };
-        
+
         let indent = " ".repeat(prefix.len());
         let effective_width = width.saturating_sub(prefix.len());
-        
+
         let mut result = String::new();
         let mut first_line = true;
-        
+
         for wrapped_part in self.wrap_content(content, effective_width) {
             if first_line {
                 result.push_str(prefix);
@@ -355,15 +362,15 @@ impl BuiltinConverter {
             }
             result.push_str(&wrapped_part);
         }
-        
+
         result
     }
-    
+
     /// Split content into chunks that fit within the given width
     fn wrap_content(&self, content: &str, width: usize) -> Vec<String> {
         let mut lines = Vec::new();
         let mut current_line = String::new();
-        
+
         for word in content.split_whitespace() {
             if current_line.is_empty() {
                 current_line = word.to_string();
@@ -375,23 +382,23 @@ impl BuiltinConverter {
                 current_line = word.to_string();
             }
         }
-        
+
         if !current_line.is_empty() {
             lines.push(current_line);
         }
-        
+
         lines
     }
-    
+
     /// Wrap a single line to the specified width
     fn wrap_line(&self, line: &str, width: usize) -> String {
         if line.len() <= width {
             return line.to_string();
         }
-        
+
         let mut result = String::new();
         let mut current_line = String::new();
-        
+
         for word in line.split_whitespace() {
             if current_line.is_empty() {
                 current_line = word.to_string();
@@ -404,11 +411,11 @@ impl BuiltinConverter {
                 current_line = word.to_string();
             }
         }
-        
+
         if !current_line.is_empty() {
             result.push_str(&current_line);
         }
-        
+
         result
     }
 }
@@ -418,12 +425,12 @@ impl HtmlToTextConverter for BuiltinConverter {
     async fn convert(&self, html: &str) -> TextRendererResult<String> {
         self.convert_html_to_text(html)
     }
-    
+
     async fn is_available(&self) -> bool {
         // Built-in converter is always available
         true
     }
-    
+
     fn name(&self) -> &'static str {
         "builtin"
     }
@@ -432,18 +439,18 @@ impl HtmlToTextConverter for BuiltinConverter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     fn create_test_converter() -> BuiltinConverter {
         BuiltinConverter::new(TextRendererConfig::default())
     }
-    
+
     #[tokio::test]
     async fn test_builtin_converter_is_available() {
         let converter = create_test_converter();
         assert!(converter.is_available().await);
         assert_eq!(converter.name(), "builtin");
     }
-    
+
     #[tokio::test]
     async fn test_simple_html_conversion() {
         let converter = create_test_converter();
@@ -451,7 +458,7 @@ mod tests {
         let result = converter.convert(html).await.unwrap();
         assert!(result.contains("Hello world!"));
     }
-    
+
     #[tokio::test]
     async fn test_css_removal() {
         let converter = create_test_converter();
@@ -462,7 +469,7 @@ mod tests {
         assert!(!result.contains("font-size"));
         assert!(!result.contains("style="));
     }
-    
+
     #[tokio::test]
     async fn test_script_and_style_tag_removal() {
         let converter = create_test_converter();
@@ -489,7 +496,7 @@ mod tests {
         assert!(!result.contains("alert"));
         assert!(!result.contains("console.log"));
     }
-    
+
     #[tokio::test]
     async fn test_list_formatting() {
         let converter = create_test_converter();
@@ -498,7 +505,7 @@ mod tests {
         assert!(result.contains("• First item"));
         assert!(result.contains("• Second item"));
     }
-    
+
     #[tokio::test]
     async fn test_heading_formatting() {
         let converter = create_test_converter();
@@ -510,7 +517,7 @@ mod tests {
         let lines: Vec<&str> = result.lines().collect();
         assert!(lines.len() > 3); // Should have spacing between elements
     }
-    
+
     #[tokio::test]
     async fn test_blockquote_formatting() {
         let converter = create_test_converter();
@@ -518,7 +525,7 @@ mod tests {
         let result = converter.convert(html).await.unwrap();
         assert!(result.contains("> This is a quoted text"));
     }
-    
+
     #[tokio::test]
     async fn test_html_with_line_breaks() {
         let converter = create_test_converter();
@@ -527,14 +534,14 @@ mod tests {
         assert!(result.contains("First paragraph"));
         assert!(result.contains("Second paragraph"));
     }
-    
+
     #[tokio::test]
     async fn test_empty_html() {
         let converter = create_test_converter();
         let result = converter.convert("").await.unwrap();
         assert_eq!(result.trim(), "");
     }
-    
+
     #[tokio::test]
     async fn test_plain_text() {
         let converter = create_test_converter();
@@ -542,18 +549,18 @@ mod tests {
         let result = converter.convert(text).await.unwrap();
         assert_eq!(result.trim(), text);
     }
-    
+
     #[test]
     fn test_wrap_line() {
         let converter = create_test_converter();
         let long_line = "This is a very long line that should be wrapped at the specified width";
         let wrapped = converter.wrap_line(long_line, 20);
-        
+
         for line in wrapped.lines() {
             assert!(line.len() <= 20);
         }
     }
-    
+
     #[test]
     fn test_clean_whitespace_improved() {
         let converter = create_test_converter();

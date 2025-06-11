@@ -6,7 +6,7 @@ use std::process::Stdio;
 use tokio::process::Command;
 
 use crate::error::{NotmuchError, Result};
-use crate::mail_sender::{MailSender, MailSenderConfig, ComposableMessage};
+use crate::mail_sender::{ComposableMessage, MailSender, MailSenderConfig};
 use crate::thread::Message;
 
 /// A mail sender that executes msmtp commands locally.
@@ -98,31 +98,36 @@ impl LocalMsmtpClient {
 impl MailSender for LocalMsmtpClient {
     async fn send(&self, message: ComposableMessage) -> Result<String> {
         let rfc822_data = message.to_rfc822()?;
-        
+
         // Build recipient list for msmtp
         let mut recipients = message.to.clone();
         recipients.extend(message.cc.clone());
         recipients.extend(message.bcc.clone());
-        
+
         let mut args = vec![];
         for recipient in &recipients {
             args.push(recipient.as_str());
         }
-        
+
         self.execute_msmtp_command(&args, &rfc822_data).await?;
         Ok(message.message_id)
     }
 
-    async fn reply(&self, original: &Message, reply: ComposableMessage, reply_all: bool) -> Result<String> {
+    async fn reply(
+        &self,
+        original: &Message,
+        reply: ComposableMessage,
+        reply_all: bool,
+    ) -> Result<String> {
         let mut full_reply = ComposableMessage::reply_builder(original, reply_all)
             .body(reply.body.clone())
             .build()?;
-        
+
         // Merge in any additional fields from the reply
         if let Some(from) = reply.from {
             full_reply.from = Some(from);
         }
-        
+
         self.send(full_reply).await
     }
 
@@ -130,27 +135,27 @@ impl MailSender for LocalMsmtpClient {
         let mut full_forward = ComposableMessage::forward_builder(original)
             .body(forward.body.clone())
             .build()?;
-        
+
         // Merge in recipients from forward
         full_forward.to = forward.to;
         full_forward.cc = forward.cc;
         full_forward.bcc = forward.bcc;
-        
+
         if let Some(from) = forward.from {
             full_forward.from = Some(from);
         }
-        
+
         self.send(full_forward).await
     }
 
     async fn test_connection(&self) -> Result<()> {
         // Test msmtp configuration with --serverinfo flag
         let mut cmd = Command::new(&self.msmtp_path);
-        
+
         if let Some(config_path) = &self.config_path {
             cmd.arg("--file").arg(config_path);
         }
-        
+
         let output = cmd
             .arg("--serverinfo")
             .stdout(Stdio::piped())
@@ -172,11 +177,11 @@ impl MailSender for LocalMsmtpClient {
     async fn get_from_address(&self) -> Result<String> {
         // Get the default from address from msmtp config
         let mut cmd = Command::new(&self.msmtp_path);
-        
+
         if let Some(config_path) = &self.config_path {
             cmd.arg("--file").arg(config_path);
         }
-        
+
         let output = cmd
             .arg("--print-config")
             .stdout(Stdio::piped())
@@ -193,7 +198,7 @@ impl MailSender for LocalMsmtpClient {
         }
 
         let config_output = String::from_utf8_lossy(&output.stdout);
-        
+
         // Parse the config output to find the from address
         for line in config_output.lines() {
             if line.starts_with("from") {
@@ -225,7 +230,10 @@ mod tests {
 
         let client = client.unwrap();
         assert_eq!(client.msmtp_path, PathBuf::from("/usr/bin/msmtp"));
-        assert_eq!(client.config_path, Some(PathBuf::from("/home/user/.msmtprc")));
+        assert_eq!(
+            client.config_path,
+            Some(PathBuf::from("/home/user/.msmtprc"))
+        );
     }
 
     #[test]

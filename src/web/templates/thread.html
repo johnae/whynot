@@ -6,7 +6,7 @@
 <div class="thread">
     <div class="thread-header">
         <a href="/inbox" class="back-link">← Back to Inbox</a>
-        <h1>{% if !messages.is_empty() %}{{ messages[0].headers.subject }}{% else %}Thread{% endif %}</h1>
+        <h1>{% if !messages.is_empty() %}{% match messages[0].headers.subject %}{% when Some with (subject) %}{{ subject }}{% when None %}(No subject){% endmatch %}{% else %}Thread{% endif %}</h1>
     </div>
     
     <div class="messages">
@@ -22,7 +22,7 @@
             </div>
             
             <div class="message-recipients">
-                <span class="label">To:</span> {{ message.headers.to }}
+                <span class="label">To:</span> {% match message.headers.to %}{% when Some with (to) %}{{ to }}{% when None %}Undisclosed recipients{% endmatch %}
             </div>
             
             <div class="message-tags">

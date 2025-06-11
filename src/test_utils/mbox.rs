@@ -101,7 +101,11 @@ impl EmailMessage {
         self
     }
 
-    pub fn with_additional_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+    pub fn with_additional_header(
+        mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
         self.additional_headers.insert(name.into(), value.into());
         self
     }

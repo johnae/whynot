@@ -10,23 +10,23 @@
 //! 2. Environment variables - Session/deployment specific overrides
 //! 3. Configuration file - Persistent defaults
 
+use crate::error::{NotmuchError, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use crate::error::{Result, NotmuchError};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
     pub mail: MailConfig,
-    
+
     #[serde(default)]
     pub ui: UiConfig,
-    
+
     #[serde(default)]
     pub user: UserConfig,
-    
+
     #[serde(default)]
     pub general: GeneralConfig,
 }
@@ -35,7 +35,7 @@ pub struct Config {
 pub struct MailConfig {
     #[serde(default)]
     pub reading: MailReadingConfig,
-    
+
     #[serde(default)]
     pub sending: MailSendingConfig,
 }
@@ -66,7 +66,7 @@ pub struct MailSendingConfig {
 pub struct UiConfig {
     #[serde(default)]
     pub web: WebConfig,
-    
+
     #[serde(default)]
     pub tui: TuiConfig, // Future TUI settings
 }
@@ -109,7 +109,12 @@ pub struct GeneralConfig {
 )]
 pub struct CliArgs {
     // Web UI options
-    #[arg(short, long, env = "WHYNOT_BIND_ADDRESS", help = "Bind address for the web server")]
+    #[arg(
+        short,
+        long,
+        env = "WHYNOT_BIND_ADDRESS",
+        help = "Bind address for the web server"
+    )]
     pub bind: Option<String>,
 
     #[arg(long, env = "WHYNOT_BASE_URL", help = "Base URL for the application")]
@@ -118,32 +123,64 @@ pub struct CliArgs {
     #[arg(long, env = "WHYNOT_ITEMS_PER_PAGE", help = "Number of items per page")]
     pub items_per_page: Option<usize>,
 
-    #[arg(long, env = "WHYNOT_DEFAULT_THEME", help = "Default theme (light/dark)")]
+    #[arg(
+        long,
+        env = "WHYNOT_DEFAULT_THEME",
+        help = "Default theme (light/dark)"
+    )]
     pub default_theme: Option<String>,
 
-    #[arg(long, env = "WHYNOT_INITIAL_PAGE_SIZE", help = "Number of messages to load initially")]
+    #[arg(
+        long,
+        env = "WHYNOT_INITIAL_PAGE_SIZE",
+        help = "Number of messages to load initially"
+    )]
     pub initial_page_size: Option<usize>,
 
-    #[arg(long, env = "WHYNOT_PAGINATION_SIZE", help = "Number of messages to load when scrolling")]
+    #[arg(
+        long,
+        env = "WHYNOT_PAGINATION_SIZE",
+        help = "Number of messages to load when scrolling"
+    )]
     pub pagination_size: Option<usize>,
 
-    #[arg(long, env = "WHYNOT_INFINITE_SCROLL_ENABLED", help = "Enable infinite scrolling")]
+    #[arg(
+        long,
+        env = "WHYNOT_INFINITE_SCROLL_ENABLED",
+        help = "Enable infinite scrolling"
+    )]
     pub infinite_scroll_enabled: Option<bool>,
 
     // Mail reading options
-    #[arg(long, env = "WHYNOT_NOTMUCH_HOST", help = "Remote notmuch server hostname")]
+    #[arg(
+        long,
+        env = "WHYNOT_NOTMUCH_HOST",
+        help = "Remote notmuch server hostname"
+    )]
     pub notmuch_host: Option<String>,
 
-    #[arg(long, env = "WHYNOT_NOTMUCH_USER", help = "Remote notmuch server username")]
+    #[arg(
+        long,
+        env = "WHYNOT_NOTMUCH_USER",
+        help = "Remote notmuch server username"
+    )]
     pub notmuch_user: Option<String>,
 
-    #[arg(long, env = "WHYNOT_NOTMUCH_PORT", help = "Remote notmuch server SSH port")]
+    #[arg(
+        long,
+        env = "WHYNOT_NOTMUCH_PORT",
+        help = "Remote notmuch server SSH port"
+    )]
     pub notmuch_port: Option<u16>,
 
     #[arg(long, env = "WHYNOT_NOTMUCH_PATH", help = "Path to notmuch executable")]
     pub notmuch_path: Option<String>,
 
-    #[arg(long, env = "WHYNOT_NOTMUCH_DATABASE", help = "Path to notmuch database (for local mode)")]
+    #[arg(
+        long,
+        env = "WHYNOT_NOTMUCH_DATABASE",
+        help = "Path to notmuch database (for local mode)"
+    )]
     pub notmuch_database: Option<String>,
 
     // Mail sending options
@@ -159,7 +196,11 @@ pub struct CliArgs {
     #[arg(long, env = "WHYNOT_MSMTP_PATH", help = "Path to msmtp executable")]
     pub msmtp_path: Option<String>,
 
-    #[arg(long, env = "WHYNOT_MSMTP_CONFIG", help = "Path to msmtp configuration file")]
+    #[arg(
+        long,
+        env = "WHYNOT_MSMTP_CONFIG",
+        help = "Path to msmtp configuration file"
+    )]
     pub msmtp_config_path: Option<String>,
 
     // User identity options
@@ -173,14 +214,27 @@ pub struct CliArgs {
     pub user_signature: Option<String>,
 
     // General options
-    #[arg(long, env = "WHYNOT_AUTO_REFRESH_INTERVAL", help = "Auto refresh interval in seconds")]
+    #[arg(
+        long,
+        env = "WHYNOT_AUTO_REFRESH_INTERVAL",
+        help = "Auto refresh interval in seconds"
+    )]
     pub auto_refresh_interval: Option<u64>,
 
-    #[arg(long, env = "WHYNOT_THREADING_ENABLED", help = "Enable email threading")]
+    #[arg(
+        long,
+        env = "WHYNOT_THREADING_ENABLED",
+        help = "Enable email threading"
+    )]
     pub threading_enabled: Option<bool>,
 
     // Configuration file
-    #[arg(short, long, env = "WHYNOT_CONFIG", help = "Path to configuration file")]
+    #[arg(
+        short,
+        long,
+        env = "WHYNOT_CONFIG",
+        help = "Path to configuration file"
+    )]
     pub config: Option<PathBuf>,
 
     // Legacy CLI arguments (for backward compatibility)
@@ -193,7 +247,10 @@ pub struct CliArgs {
     #[arg(long, help = "Remote server SSH port (legacy, use --notmuch-port)")]
     pub port: Option<u16>,
 
-    #[arg(long, help = "Path to notmuch database (legacy, use --notmuch-database)")]
+    #[arg(
+        long,
+        help = "Path to notmuch database (legacy, use --notmuch-database)"
+    )]
     pub database: Option<String>,
 }
 
@@ -284,19 +341,21 @@ impl Config {
             return Ok(None);
         }
 
-        let content = std::fs::read_to_string(&path)
-            .map_err(|e| NotmuchError::ConfigError(format!(
+        let content = std::fs::read_to_string(&path).map_err(|e| {
+            NotmuchError::ConfigError(format!(
                 "Failed to read configuration file {}: {}",
                 path.display(),
                 e
-            )))?;
+            ))
+        })?;
 
-        let config: Config = toml::from_str(&content)
-            .map_err(|e| NotmuchError::ConfigError(format!(
+        let config: Config = toml::from_str(&content).map_err(|e| {
+            NotmuchError::ConfigError(format!(
                 "Failed to parse configuration file {}: {}",
                 path.display(),
                 e
-            )))?;
+            ))
+        })?;
 
         Ok(Some(config))
     }
@@ -599,16 +658,22 @@ impl Config {
 
     /// Convert to a socket address for web server binding
     pub fn bind_address(&self) -> Result<SocketAddr> {
-        let bind_str = self.ui.web.bind.as_ref()
-            .ok_or_else(|| NotmuchError::ConfigError("No bind address configured".to_string()))?;
-        
-        bind_str.parse()
-            .map_err(|e| NotmuchError::ConfigError(format!("Invalid bind address '{}': {}", bind_str, e)))
+        let bind_str =
+            self.ui.web.bind.as_ref().ok_or_else(|| {
+                NotmuchError::ConfigError("No bind address configured".to_string())
+            })?;
+
+        bind_str.parse().map_err(|e| {
+            NotmuchError::ConfigError(format!("Invalid bind address '{}': {}", bind_str, e))
+        })
     }
 
     /// Get the base URL for the web application
     pub fn base_url(&self) -> String {
-        self.ui.web.base_url.as_ref()
+        self.ui
+            .web
+            .base_url
+            .as_ref()
             .unwrap_or(&"http://localhost:8080".to_string())
             .clone()
     }
@@ -620,12 +685,20 @@ impl Config {
 
     /// Create a ClientConfig for notmuch from this configuration
     pub fn to_client_config(&self) -> Result<crate::client::ClientConfig> {
-        let is_remote = self.mail.reading.connection_type.as_deref() == Some("remote") 
+        let is_remote = self.mail.reading.connection_type.as_deref() == Some("remote")
             || self.mail.reading.host.is_some();
 
         if is_remote {
-            let host = self.mail.reading.host.as_ref()
-                .ok_or_else(|| NotmuchError::ConfigError("Remote host not configured for mail reading".to_string()))?
+            let host = self
+                .mail
+                .reading
+                .host
+                .as_ref()
+                .ok_or_else(|| {
+                    NotmuchError::ConfigError(
+                        "Remote host not configured for mail reading".to_string(),
+                    )
+                })?
                 .clone();
 
             Ok(crate::client::ClientConfig::Remote {
@@ -646,12 +719,20 @@ impl Config {
 
     /// Create a MailSenderConfig from this configuration
     pub fn to_mail_sender_config(&self) -> Result<crate::mail_sender::MailSenderConfig> {
-        let is_remote = self.mail.sending.connection_type.as_deref() == Some("remote") 
+        let is_remote = self.mail.sending.connection_type.as_deref() == Some("remote")
             || self.mail.sending.host.is_some();
 
         if is_remote {
-            let host = self.mail.sending.host.as_ref()
-                .ok_or_else(|| NotmuchError::ConfigError("Remote host not configured for mail sending".to_string()))?
+            let host = self
+                .mail
+                .sending
+                .host
+                .as_ref()
+                .ok_or_else(|| {
+                    NotmuchError::ConfigError(
+                        "Remote host not configured for mail sending".to_string(),
+                    )
+                })?
                 .clone();
 
             Ok(crate::mail_sender::MailSenderConfig::Remote {
