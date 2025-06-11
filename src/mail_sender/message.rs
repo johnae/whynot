@@ -100,60 +100,145 @@ impl ComposableMessage {
             message.push_str(&format!("{}: {}\r\n", key, value));
         }
 
-        // MIME headers if needed
+        // Determine MIME structure based on content
         let has_html = self.html_body.is_some();
         let has_attachments = !self.attachments.is_empty();
 
-        if has_html || has_attachments {
-            let boundary = format!("boundary_{}", Uuid::new_v4());
-            message.push_str("MIME-Version: 1.0\r\n");
-            message.push_str(&format!(
-                "Content-Type: multipart/mixed; boundary=\"{}\"\r\n",
-                boundary
-            ));
-            message.push_str("\r\n");
+        match (has_html, has_attachments) {
+            (false, false) => {
+                // Case 1: Plain text only - no multipart needed
+                message.push_str("Content-Type: text/plain; charset=utf-8\r\n");
+                message.push_str("\r\n");
+                message.push_str(&self.body);
+            }
+            (true, false) => {
+                // Case 2: Text + HTML - use multipart/alternative
+                let boundary = format!("boundary_{}", Uuid::new_v4());
+                message.push_str("MIME-Version: 1.0\r\n");
+                message.push_str(&format!(
+                    "Content-Type: multipart/alternative; boundary=\"{}\"\r\n",
+                    boundary
+                ));
+                message.push_str("\r\n");
 
-            // Text part
-            message.push_str(&format!("--{}\r\n", boundary));
-            message.push_str("Content-Type: text/plain; charset=utf-8\r\n");
-            message.push_str("Content-Transfer-Encoding: quoted-printable\r\n");
-            message.push_str("\r\n");
-            message.push_str(&self.body);
-            message.push_str("\r\n");
-
-            // HTML part if present
-            if let Some(html) = &self.html_body {
+                // Plain text part
                 message.push_str(&format!("--{}\r\n", boundary));
-                message.push_str("Content-Type: text/html; charset=utf-8\r\n");
+                message.push_str("Content-Type: text/plain; charset=utf-8\r\n");
                 message.push_str("Content-Transfer-Encoding: quoted-printable\r\n");
                 message.push_str("\r\n");
-                message.push_str(html);
+                message.push_str(&self.body);
                 message.push_str("\r\n");
-            }
 
-            // Attachments
-            for attachment in &self.attachments {
-                message.push_str(&format!("--{}\r\n", boundary));
-                message.push_str(&format!("Content-Type: {}\r\n", attachment.content_type));
+                // HTML part
+                if let Some(html) = &self.html_body {
+                    message.push_str(&format!("--{}\r\n", boundary));
+                    message.push_str("Content-Type: text/html; charset=utf-8\r\n");
+                    message.push_str("Content-Transfer-Encoding: quoted-printable\r\n");
+                    message.push_str("\r\n");
+                    message.push_str(html);
+                    message.push_str("\r\n");
+                }
+
+                message.push_str(&format!("--{}--\r\n", boundary));
+            }
+            (false, true) => {
+                // Case 3: Text + attachments - use multipart/mixed
+                let boundary = format!("boundary_{}", Uuid::new_v4());
+                message.push_str("MIME-Version: 1.0\r\n");
                 message.push_str(&format!(
-                    "Content-Disposition: attachment; filename=\"{}\"\r\n",
-                    attachment.filename
-                ));
-                message.push_str("Content-Transfer-Encoding: base64\r\n");
-                message.push_str("\r\n");
-                message.push_str(&base64::Engine::encode(
-                    &base64::engine::general_purpose::STANDARD,
-                    &attachment.data,
+                    "Content-Type: multipart/mixed; boundary=\"{}\"\r\n",
+                    boundary
                 ));
                 message.push_str("\r\n");
-            }
 
-            message.push_str(&format!("--{}--\r\n", boundary));
-        } else {
-            // Simple plain text message
-            message.push_str("Content-Type: text/plain; charset=utf-8\r\n");
-            message.push_str("\r\n");
-            message.push_str(&self.body);
+                // Plain text part
+                message.push_str(&format!("--{}\r\n", boundary));
+                message.push_str("Content-Type: text/plain; charset=utf-8\r\n");
+                message.push_str("Content-Transfer-Encoding: quoted-printable\r\n");
+                message.push_str("\r\n");
+                message.push_str(&self.body);
+                message.push_str("\r\n");
+
+                // Attachments
+                for attachment in &self.attachments {
+                    message.push_str(&format!("--{}\r\n", boundary));
+                    message.push_str(&format!("Content-Type: {}\r\n", attachment.content_type));
+                    message.push_str(&format!(
+                        "Content-Disposition: attachment; filename=\"{}\"\r\n",
+                        attachment.filename
+                    ));
+                    message.push_str("Content-Transfer-Encoding: base64\r\n");
+                    message.push_str("\r\n");
+                    message.push_str(&base64::Engine::encode(
+                        &base64::engine::general_purpose::STANDARD,
+                        &attachment.data,
+                    ));
+                    message.push_str("\r\n");
+                }
+
+                message.push_str(&format!("--{}--\r\n", boundary));
+            }
+            (true, true) => {
+                // Case 4: Text + HTML + attachments - nested multipart structure
+                let outer_boundary = format!("boundary_{}", Uuid::new_v4());
+                let inner_boundary = format!("boundary_{}", Uuid::new_v4());
+                
+                message.push_str("MIME-Version: 1.0\r\n");
+                message.push_str(&format!(
+                    "Content-Type: multipart/mixed; boundary=\"{}\"\r\n",
+                    outer_boundary
+                ));
+                message.push_str("\r\n");
+
+                // Nested multipart/alternative for text choices
+                message.push_str(&format!("--{}\r\n", outer_boundary));
+                message.push_str(&format!(
+                    "Content-Type: multipart/alternative; boundary=\"{}\"\r\n",
+                    inner_boundary
+                ));
+                message.push_str("\r\n");
+
+                // Plain text part
+                message.push_str(&format!("--{}\r\n", inner_boundary));
+                message.push_str("Content-Type: text/plain; charset=utf-8\r\n");
+                message.push_str("Content-Transfer-Encoding: quoted-printable\r\n");
+                message.push_str("\r\n");
+                message.push_str(&self.body);
+                message.push_str("\r\n");
+
+                // HTML part
+                if let Some(html) = &self.html_body {
+                    message.push_str(&format!("--{}\r\n", inner_boundary));
+                    message.push_str("Content-Type: text/html; charset=utf-8\r\n");
+                    message.push_str("Content-Transfer-Encoding: quoted-printable\r\n");
+                    message.push_str("\r\n");
+                    message.push_str(html);
+                    message.push_str("\r\n");
+                }
+
+                // Close inner multipart/alternative
+                message.push_str(&format!("--{}--\r\n", inner_boundary));
+
+                // Attachments at outer level
+                for attachment in &self.attachments {
+                    message.push_str(&format!("--{}\r\n", outer_boundary));
+                    message.push_str(&format!("Content-Type: {}\r\n", attachment.content_type));
+                    message.push_str(&format!(
+                        "Content-Disposition: attachment; filename=\"{}\"\r\n",
+                        attachment.filename
+                    ));
+                    message.push_str("Content-Transfer-Encoding: base64\r\n");
+                    message.push_str("\r\n");
+                    message.push_str(&base64::Engine::encode(
+                        &base64::engine::general_purpose::STANDARD,
+                        &attachment.data,
+                    ));
+                    message.push_str("\r\n");
+                }
+
+                // Close outer multipart/mixed
+                message.push_str(&format!("--{}--\r\n", outer_boundary));
+            }
         }
 
         Ok(message.into_bytes())
