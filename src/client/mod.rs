@@ -248,7 +248,7 @@ pub trait NotmuchClient: Send + Sync {
     ///     
     ///     for message in thread.get_messages() {
     ///         println!("From: {}", message.headers.from);
-    ///         println!("Subject: {}", message.headers.subject);
+    ///         println!("Subject: {}", message.headers.subject.as_deref().unwrap_or("(no subject)"));
     ///     }
     /// }
     /// # Ok(())
