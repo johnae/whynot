@@ -316,29 +316,37 @@ fn draw_compose(f: &mut Frame, app: &mut App, area: Rect) {
         app.compose_form.body.clone()
     };
 
+    // Create body field title with mode indicator
+    let body_title = if app.compose_form.markdown_mode {
+        "Body [Markdown]"
+    } else {
+        "Body [Plain]"
+    };
+
     let body_paragraph = Paragraph::new(body_text)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("Body")
+                .title(body_title)
                 .border_style(field_style(&crate::tui::app::ComposeField::Body)),
         )
         .wrap(Wrap { trim: true });
     f.render_widget(body_paragraph, chunks[4]);
 
-    // Instructions
+    // Instructions with mode indicator and Ctrl+M toggle
+    let mode_text = if app.compose_form.markdown_mode { "Markdown" } else { "Plain" };
     let instructions = match app.compose_form.mode {
         crate::tui::app::ComposeMode::New => {
-            "New Email - Tab/Shift+Tab: switch fields, Enter: newline in body, Ctrl+S: send, Esc: cancel"
+            format!("New Email [{}] - Tab/Shift+Tab: switch fields, Enter: newline, Ctrl+M: toggle mode, Ctrl+S: send, Esc: cancel", mode_text)
         }
         crate::tui::app::ComposeMode::Reply(_) => {
-            "Reply - Tab/Shift+Tab: switch fields, Enter: newline in body, Ctrl+S: send, Esc: cancel"
+            format!("Reply [{}] - Tab/Shift+Tab: switch fields, Enter: newline, Ctrl+M: toggle mode, Ctrl+S: send, Esc: cancel", mode_text)
         }
         crate::tui::app::ComposeMode::ReplyAll(_) => {
-            "Reply All - Tab/Shift+Tab: switch fields, Enter: newline in body, Ctrl+S: send, Esc: cancel"
+            format!("Reply All [{}] - Tab/Shift+Tab: switch fields, Enter: newline, Ctrl+M: toggle mode, Ctrl+S: send, Esc: cancel", mode_text)
         }
         crate::tui::app::ComposeMode::Forward(_) => {
-            "Forward - Tab/Shift+Tab: switch fields, Enter: newline in body, Ctrl+S: send, Esc: cancel"
+            format!("Forward [{}] - Tab/Shift+Tab: switch fields, Enter: newline, Ctrl+M: toggle mode, Ctrl+S: send, Esc: cancel", mode_text)
         }
     };
 
