@@ -87,6 +87,7 @@ pub struct TuiConfig {
     pub keybindings: Option<String>,
     pub show_sidebar: Option<bool>,
     pub styled_text: Option<bool>,
+    pub markdown_compose: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -275,6 +276,7 @@ impl Default for TuiConfig {
             keybindings: Some("vim".to_string()),
             show_sidebar: Some(true),
             styled_text: Some(false), // Default to false for backward compatibility
+            markdown_compose: Some(false), // Default to false for backward compatibility
         }
     }
 }
@@ -634,6 +636,12 @@ impl Config {
         }
         if other.ui.tui.show_sidebar.is_some() {
             base.ui.tui.show_sidebar = other.ui.tui.show_sidebar;
+        }
+        if other.ui.tui.styled_text.is_some() {
+            base.ui.tui.styled_text = other.ui.tui.styled_text;
+        }
+        if other.ui.tui.markdown_compose.is_some() {
+            base.ui.tui.markdown_compose = other.ui.tui.markdown_compose;
         }
 
         // Merge user config

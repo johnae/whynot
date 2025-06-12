@@ -7,10 +7,11 @@ use crate::text_renderer::{
     HtmlToTextConverter, TextRendererConfig, TextRendererFactory, styled::StyledTextConverter,
 };
 use crate::thread::{Message, Thread};
+use crate::tui::markdown::markdown_to_html;
 use ratatui::text::Text;
 use std::sync::Arc;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub enum AppState {
     #[default]
     EmailList,
@@ -20,7 +21,7 @@ pub enum AppState {
     Help,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub enum ComposeMode {
     #[default]
     New,
@@ -48,6 +49,7 @@ pub struct ComposeForm {
     pub subject: String,
     pub body: String,
     pub current_field: ComposeField,
+    pub markdown_mode: bool,
 }
 
 pub struct App {
@@ -104,6 +106,9 @@ pub struct App {
 
     /// Mail sender for sending emails (optional if not configured)
     mail_sender: Option<Box<dyn MailSender>>,
+
+    /// Default markdown compose mode setting
+    markdown_compose_default: bool,
 }
 
 impl App {
@@ -114,6 +119,9 @@ impl App {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         // Check if styled text is enabled
         let styled_text_enabled = config.ui.tui.styled_text.unwrap_or(false);
+
+        // Check markdown compose default setting
+        let markdown_compose_default = config.ui.tui.markdown_compose.unwrap_or(false);
 
         // Create HTML to text converter (always need this for compatibility)
         let text_config = TextRendererConfig::default();
@@ -145,6 +153,7 @@ impl App {
             styled_text_enabled,
             styled_converter,
             mail_sender,
+            markdown_compose_default,
         })
     }
 
@@ -562,6 +571,7 @@ impl App {
 
         self.compose_form = ComposeForm {
             mode: ComposeMode::New,
+            markdown_mode: self.markdown_compose_default,
             ..Default::default()
         };
         self.state = AppState::Compose;
@@ -746,6 +756,12 @@ impl App {
                         .subject(self.compose_form.subject.clone())
                         .body(self.compose_form.body.clone());
 
+                    // Add HTML body if markdown mode is enabled
+                    if self.compose_form.markdown_mode {
+                        let html_body = markdown_to_html(&self.compose_form.body);
+                        builder = builder.html_body(html_body);
+                    }
+
                     // Add CC recipients if any
                     for cc_email in self.parse_email_list(&self.compose_form.cc) {
                         builder = builder.cc(cc_email);
@@ -773,13 +789,19 @@ impl App {
                         let is_reply_all =
                             matches!(self.compose_form.mode, ComposeMode::ReplyAll(_));
 
-                        let reply = ComposableMessage::builder()
+                        let mut reply_builder = ComposableMessage::builder()
                             .to("dummy@example.com".to_string()) // Will be replaced by reply builder
-                            .body(self.compose_form.body.clone())
-                            .build()
-                            .map_err(|e| {
-                                NotmuchError::ConfigError(format!("Failed to build reply: {}", e))
-                            })?;
+                            .body(self.compose_form.body.clone());
+
+                        // Add HTML body if markdown mode is enabled
+                        if self.compose_form.markdown_mode {
+                            let html_body = markdown_to_html(&self.compose_form.body);
+                            reply_builder = reply_builder.html_body(html_body);
+                        }
+
+                        let reply = reply_builder.build().map_err(|e| {
+                            NotmuchError::ConfigError(format!("Failed to build reply: {}", e))
+                        })?;
 
                         let _message_id = mail_sender
                             .reply(original_message, reply, is_reply_all)
@@ -802,6 +824,12 @@ impl App {
                         let mut builder = ComposableMessage::builder()
                             .to(self.compose_form.to.clone())
                             .body(self.compose_form.body.clone());
+
+                        // Add HTML body if markdown mode is enabled
+                        if self.compose_form.markdown_mode {
+                            let html_body = markdown_to_html(&self.compose_form.body);
+                            builder = builder.html_body(html_body);
+                        }
 
                         // Add CC recipients if any
                         for cc_email in self.parse_email_list(&self.compose_form.cc) {
@@ -855,5 +883,20 @@ impl App {
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect()
+    }
+
+    /// Toggle markdown mode in compose form
+    pub fn toggle_compose_markdown_mode(&mut self) {
+        if self.state == AppState::Compose {
+            self.compose_form.markdown_mode = !self.compose_form.markdown_mode;
+            
+            let status = if self.compose_form.markdown_mode {
+                "Markdown mode enabled"
+            } else {
+                "Markdown mode disabled"
+            };
+            
+            self.set_status(status.to_string());
+        }
     }
 }

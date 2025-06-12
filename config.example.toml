@@ -97,6 +97,12 @@ show_sidebar = true
 # When disabled, emails are displayed as plain text (default: false)
 styled_text = false
 
+# Enable markdown composition in TUI by default
+# When enabled, new emails start in markdown mode with automatic HTML conversion
+# When disabled, emails are composed in plain text mode (default: false)
+# Note: Users can always toggle markdown mode with Ctrl+M during composition
+markdown_compose = false
+
 # General application behavior
 [general]
 # Auto-refresh interval in seconds (0 to disable)

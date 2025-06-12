@@ -169,36 +169,41 @@ async fn run_app<B: ratatui::backend::Backend>(
                         _ => {}
                     },
                     whynot::tui::app::AppState::Compose => {
-                        match key.code {
-                            crossterm::event::KeyCode::Esc => {
-                                app.go_back();
-                            }
-                            crossterm::event::KeyCode::Tab => {
-                                app.compose_next_field();
-                            }
-                            crossterm::event::KeyCode::BackTab => {
-                                app.compose_prev_field();
-                            }
-                            crossterm::event::KeyCode::Enter => {
-                                // Handle Enter key in compose mode
-                                app.compose_handle_enter();
-                            }
-                            crossterm::event::KeyCode::Char('s')
-                                if key
-                                    .modifiers
-                                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                            {
-                                if let Err(e) = app.send_composed_email().await {
-                                    app.set_status(format!("Send error: {}", e));
+                        // Check for markdown toggle first (using the event helper)
+                        if event.is_markdown_toggle() {
+                            app.toggle_compose_markdown_mode();
+                        } else {
+                            match key.code {
+                                crossterm::event::KeyCode::Esc => {
+                                    app.go_back();
                                 }
+                                crossterm::event::KeyCode::Tab => {
+                                    app.compose_next_field();
+                                }
+                                crossterm::event::KeyCode::BackTab => {
+                                    app.compose_prev_field();
+                                }
+                                crossterm::event::KeyCode::Enter => {
+                                    // Handle Enter key in compose mode
+                                    app.compose_handle_enter();
+                                }
+                                crossterm::event::KeyCode::Char('s')
+                                    if key
+                                        .modifiers
+                                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                                {
+                                    if let Err(e) = app.send_composed_email().await {
+                                        app.set_status(format!("Send error: {}", e));
+                                    }
+                                }
+                                crossterm::event::KeyCode::Backspace => {
+                                    app.compose_handle_backspace();
+                                }
+                                crossterm::event::KeyCode::Char(c) => {
+                                    app.compose_handle_char(c);
+                                }
+                                _ => {}
                             }
-                            crossterm::event::KeyCode::Backspace => {
-                                app.compose_handle_backspace();
-                            }
-                            crossterm::event::KeyCode::Char(c) => {
-                                app.compose_handle_char(c);
-                            }
-                            _ => {}
                         }
                     }
                 }
