@@ -151,11 +151,10 @@ fn draw_email_body(f: &mut Frame, app: &App, area: Rect) {
     let body_text = app
         .current_email_body
         .clone()
-        .unwrap_or_else(|| "[No body content]".to_string());
+        .unwrap_or_else(|| ratatui::text::Text::from("[No body content]"));
 
     // Count total lines for scroll indicators
-    let lines: Vec<&str> = body_text.lines().collect();
-    let total_lines = lines.len();
+    let total_lines = body_text.lines.len();
 
     // Create title with scroll indicator
     let title = if total_lines > (area.height as usize).saturating_sub(2) {

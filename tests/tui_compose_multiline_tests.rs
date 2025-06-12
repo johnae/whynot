@@ -1,5 +1,6 @@
 use whynot::{
     client::{NotmuchClient, TagOperation},
+    config::Config,
     error::NotmuchError,
     mail_sender::{ComposableMessage, MailSender},
     thread::Message,
@@ -101,7 +102,8 @@ impl MailSender for MockMailSender {
 async fn test_compose_multiline_body_input() {
     let client = std::sync::Arc::new(MockNotmuchClient);
     let mail_sender = Some(Box::new(MockMailSender) as Box<dyn MailSender>);
-    let mut app = App::new(client as std::sync::Arc<dyn NotmuchClient>, mail_sender)
+    let config = Config::default();
+    let mut app = App::new(client as std::sync::Arc<dyn NotmuchClient>, mail_sender, &config)
         .await
         .unwrap();
 
@@ -154,7 +156,8 @@ async fn test_compose_multiline_body_input() {
 async fn test_compose_enter_behavior_in_non_body_fields() {
     let client = std::sync::Arc::new(MockNotmuchClient);
     let mail_sender = Some(Box::new(MockMailSender) as Box<dyn MailSender>);
-    let mut app = App::new(client as std::sync::Arc<dyn NotmuchClient>, mail_sender)
+    let config = Config::default();
+    let mut app = App::new(client as std::sync::Arc<dyn NotmuchClient>, mail_sender, &config)
         .await
         .unwrap();
 
@@ -199,7 +202,8 @@ async fn test_compose_enter_behavior_in_non_body_fields() {
 async fn test_compose_backspace_with_multiline_content() {
     let client = std::sync::Arc::new(MockNotmuchClient);
     let mail_sender = Some(Box::new(MockMailSender) as Box<dyn MailSender>);
-    let mut app = App::new(client as std::sync::Arc<dyn NotmuchClient>, mail_sender)
+    let config = Config::default();
+    let mut app = App::new(client as std::sync::Arc<dyn NotmuchClient>, mail_sender, &config)
         .await
         .unwrap();
 
