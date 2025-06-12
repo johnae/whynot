@@ -22,7 +22,8 @@ If you use notmuch to index your email but miss having decent interfaces to actu
 - **Full-featured**: Complete email client with vim-like navigation (j/k, /, ?)
 - **Content Scrolling**: Navigate long emails with j/k, Page Up/Down, Home/G
 - **Thread Navigation**: Access all messages in threads with n/p keys
-- **HTML Support**: Rich HTML emails converted to readable terminal text
+- **HTML Support**: Rich HTML emails converted to readable terminal text with optional styled rendering
+- **Markdown Composition**: Write emails in Markdown with automatic HTML conversion (Ctrl+M to toggle)
 - **Complete Composition**: Write, reply, and send emails with multi-line support
 - **Search Integration**: Full notmuch query support with modal interface
 
@@ -114,6 +115,7 @@ See `config.example.toml` for a comprehensive example with all available options
 - Mail sending (local/remote msmtp configuration)
 - User identity (name, email, signature)
 - UI customization (themes, auto-refresh, pagination)
+- TUI settings (styled text rendering, default markdown compose mode)
 - Advanced settings (threading, external tools)
 
 ## Key Bindings (TUI)
@@ -138,6 +140,7 @@ See `config.example.toml` for a comprehensive example with all available options
 ### Compose Mode
 - `Tab/Shift+Tab` - Navigate between form fields
 - `Enter` - New line in body field, move to next field in headers
+- `Ctrl+M` - Toggle markdown mode (automatic HTML conversion for rich emails)
 - `Ctrl+S` - Send email
 - `Esc` - Cancel compose
 
@@ -175,7 +178,9 @@ devenv shell cargo run --bin whynot-tui
 - **Client**: Unified trait-based interface supporting local and SSH execution with connection pooling
 - **Mail Sending**: Complete msmtp integration with local/remote support and connection testing
 - **Web**: Axum-based server with Askama templates, GitHub-inspired styling, and HTMX interactivity
-- **TUI**: Full ratatui-based terminal interface with vim-like navigation and complete functionality
+- **TUI**: Full ratatui-based terminal interface with vim-like navigation, markdown composition, and complete functionality
+- **Text Rendering**: Smart HTML-to-text conversion with optional styled rendering and comprehensive HTML entity support
+- **Markdown Support**: Built-in markdown-to-HTML conversion using pulldown-cmark for rich email composition
 - **Configuration**: Unified system with CLI/environment/file precedence and comprehensive validation
 - **Testing**: Extensive test suite with temporary notmuch databases and integration testing
 
