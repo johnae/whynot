@@ -19,11 +19,14 @@ async fn test_styled_text_vs_plain_text() {
     // Create a config with styled text ENABLED
     let mut config_styled = Config::default();
     config_styled.ui.tui.styled_text = Some(true);
-    let app_styled = App::new(client.clone(), None, &config_styled).await.unwrap();
+    let app_styled = App::new(client.clone(), None, &config_styled)
+        .await
+        .unwrap();
 
     // Create a mock message with HTML content that should show styling differences
-    let html_content = r#"<b>Bold text</b> and <i>italic text</i> and <a href="https://example.com">a link</a>"#;
-    
+    let html_content =
+        r#"<b>Bold text</b> and <i>italic text</i> and <a href="https://example.com">a link</a>"#;
+
     let body_part = BodyPart {
         id: 1,
         content_type: "text/html".to_string(),
@@ -58,7 +61,7 @@ async fn test_styled_text_vs_plain_text() {
 
     // Process with plain text (should have no styling)
     let plain_result = app_plain.process_email_body_styled(&message).await;
-    
+
     // Process with styled text (should have styling)
     let styled_result = app_styled.process_email_body_styled(&message).await;
 
@@ -93,35 +96,47 @@ async fn test_styled_text_vs_plain_text() {
 
     // Styled version should have multiple spans with different styles
     let styled_spans = &styled_text.lines[0].spans;
-    assert!(styled_spans.len() > 1, "Styled text should have multiple spans");
-    
-    // Look for bold text span
-    let has_bold = styled_spans.iter().any(|span| 
-        span.content.contains("Bold text") && 
-        span.style.add_modifier.contains(ratatui::style::Modifier::BOLD)
+    assert!(
+        styled_spans.len() > 1,
+        "Styled text should have multiple spans"
     );
+
+    // Look for bold text span
+    let has_bold = styled_spans.iter().any(|span| {
+        span.content.contains("Bold text")
+            && span
+                .style
+                .add_modifier
+                .contains(ratatui::style::Modifier::BOLD)
+    });
     assert!(has_bold, "Should have bold text span");
 
-    // Look for italic text span  
-    let has_italic = styled_spans.iter().any(|span|
-        span.content.contains("italic text") &&
-        span.style.add_modifier.contains(ratatui::style::Modifier::ITALIC)
-    );
+    // Look for italic text span
+    let has_italic = styled_spans.iter().any(|span| {
+        span.content.contains("italic text")
+            && span
+                .style
+                .add_modifier
+                .contains(ratatui::style::Modifier::ITALIC)
+    });
     assert!(has_italic, "Should have italic text span");
 
     // Look for link span (cyan + underlined)
-    let has_link = styled_spans.iter().any(|span|
-        span.content.contains("a link") &&
-        span.style.fg == Some(ratatui::style::Color::Cyan) &&
-        span.style.add_modifier.contains(ratatui::style::Modifier::UNDERLINED)
-    );
+    let has_link = styled_spans.iter().any(|span| {
+        span.content.contains("a link")
+            && span.style.fg == Some(ratatui::style::Color::Cyan)
+            && span
+                .style
+                .add_modifier
+                .contains(ratatui::style::Modifier::UNDERLINED)
+    });
     assert!(has_link, "Should have styled link span");
 }
 
-#[tokio::test] 
+#[tokio::test]
 async fn test_plain_text_unchanged() {
     // Test that plain text emails work the same with or without styled text enabled
-    
+
     let mut config_styled = Config::default();
     config_styled.ui.tui.styled_text = Some(true);
     let client_config = config_styled.to_client_config().unwrap();
@@ -130,7 +145,7 @@ async fn test_plain_text_unchanged() {
     let app = App::new(client, None, &config_styled).await.unwrap();
 
     let plain_content = "This is plain text with no HTML tags.";
-    
+
     let body_part = BodyPart {
         id: 1,
         content_type: "text/plain".to_string(),
@@ -165,11 +180,14 @@ async fn test_plain_text_unchanged() {
 
     let result = app.process_email_body_styled(&message).await;
     assert!(result.is_some());
-    
+
     let text = result.unwrap();
     assert_eq!(text.lines.len(), 1);
     assert_eq!(text.lines[0].spans.len(), 1);
     assert_eq!(text.lines[0].spans[0].content, plain_content);
     // Plain text should have default styling
-    assert_eq!(text.lines[0].spans[0].style, ratatui::style::Style::default());
+    assert_eq!(
+        text.lines[0].spans[0].style,
+        ratatui::style::Style::default()
+    );
 }
